@@ -11,6 +11,7 @@ def load_rss_documents(source: dict):
             doc.metadata['source_name'] = source['name']
             doc.metadata['source_type'] = source['type']
             doc.metadata['unique_id'] = doc.metadata.get('guid', doc.metadata.get('link'))
+        return docs
     except Exception as e:
         print(f"Error loading {source['base_url']}: {e}")
         return []
