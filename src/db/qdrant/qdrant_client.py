@@ -1,5 +1,5 @@
 from qdrant_client import QdrantClient
-from qdrant_client.models import VectorParams, Distance, PointStruct
+from qdrant_client.models import VectorParams, Distance, PointStruct, Filter, FieldCondition, MatchValue
 import os
 
 QDRANT_URL = os.getenv("QDRANT_URL", "http://localhost:6333")
@@ -34,9 +34,31 @@ class QdrantStorage():
         for r in results:
             payload = getattr(r, "payload", None) or {}
             text = payload.get("text", "")
-            source = payload.get("source", "")
+            source = payload.get("source_url", "")
             if source:
                 contexts.append(text)
                 sources.add(source)
 
         return {"contexts": contexts, "sources": list(sources)}
+    
+    def delete_by_document_id(self, document_id):
+        """Deletes al vectors associated with a given document_id"""
+        try:
+            filter = Filter(
+                must=[
+                    FieldCondition(
+                        key="document_id",
+                        match=MatchValue(value=str(document_id))
+                    )
+                ]
+            )
+            self.client.delete(
+                self.collection,
+                points_selector=filter
+            )
+            print(f"Deleted all chunks for document {document_id}: {e}")
+            return True
+        except Exception as e:
+            print(f"Error deleting chunks for document {document_id}: {e}")
+            return False
+        
