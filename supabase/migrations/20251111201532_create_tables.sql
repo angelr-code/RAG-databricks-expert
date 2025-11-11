@@ -10,12 +10,13 @@ CREATE TABLE sources (
 );
 
 CREATE TABLE documents (
-  document_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   source_id uuid REFERENCES sources(source_id) ON DELETE SET NULL,
   url text NOT NULL,
   title TEXT,
+  published_at timestamptz,
   hash text UNIQUE,
   n_chunks integer DEFAULT 0,
-  ingested_at timestamptz DEFAULT now(),
+  ingested_at timestamptz DEFAULT NULL,
   updated_at timestamptz DEFAULT now()
 );

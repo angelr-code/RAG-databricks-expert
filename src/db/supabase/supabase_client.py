@@ -13,14 +13,12 @@ class SupabaseManager:
 
     # --- Sources management ---
 
-    def insert_source(self, name, base_url, type, description, active):
+    def insert_source(self, name, base_url, type):
         try:
             data = {
                 'name': name,
                 'base_url': base_url,
                 'type': type,
-                'description': description,
-                'active': active
             }
             response = self.client.table(self.sources_table)\
                                 .insert(data)\
@@ -34,26 +32,10 @@ class SupabaseManager:
             print(f"Error inserting a new source: {e}")
             return None
         
-    def update_source_status(self, source_id, active):
-        """Updates source status to either active or inactive"""
-        try:
-            response = self.client.table("sources")\
-                                .update({"active": active, "updated_at": datetime.now().isoformat()})\
-                                .eq("id", source_id)\
-                                .update("*")\
-                                .execute()
-            if response.data:
-                print(f"Source {id} status changed to active={active}")
-                return response.data[0]
-            return None
-        except Exception as e:
-            print(f"Error modifying the source {id} status: {e}")
-            return None
-        
     def list_sources(self):
         """Lists all the registered sources"""
         try:
-            response = self.client.table("sources")\
+            response = self.client.table(self.sources_table)\
                                 .select("*")\
                                 .execute()
             return response.data
@@ -61,45 +43,49 @@ class SupabaseManager:
             print(f"Error listing sources: {e}")
             return []
 
-    def get_active_sources(self):
-        """Returns all the sources labeled as active"""
-        try:
-            response = self.client.table("sources")\
-                                .select("*")\
-                                .eq("active", True)\
-                                .execute()
-            return response.data
-        except Exception as e:
-            print(f"Error fetching active sources: {e}")
-            return []
         
 
     # --- Documents management ---
 
-    def get_document_by_hash(self, hash):
-        """Searchs for a document based on its hash"""
+    def get_document_by_url(self, url):
+        """Searchs for a document based on its URL (to check for updates)"""
         try:
-            response = self.client.table("documents")\
-                                .select("id")\
-                                .eq("hash", hash)\
+            response = self.client.table(self.documents_table)\
+                                .select("document_id, content_hash")\
+                                .eq("url", url)\
                                 .execute()
-            return response.data
+            return response.data[0] if response.data else None
         except Exception as e:
-            print(f"Error checking the hash {hash}: {e}")
+            print(f"Error checking the document for url {url}: {e}")
             return None
         
-    def insert_document(self, source_id, source_url, doc_hash, metadata):
+    def update_document_hash(self, document_id, new_hash):
+        """Updates the hash of a document when its content has been ingested to Qdrant"""
+        try:
+            data = {
+                "hash": new_hash,
+                "updated_at": datetime.now().isoformat()
+            }
+            response = self.client.table(self.documents_table)\
+                                .update(data)\
+                                .eq("id", document_id)\
+                                .execute()
+            if response.data:
+                print(f"Document {document_id} updated with new hash.")
+                return True
+            return False
+        except Exception as e:
+            print(f"Error updating document {document_id} hash: {e}")
+            return False
+                
+    def insert_document(self, source_id, url, doc_hash, metadata):
         try:
             data = {
                 "source_id": source_id,
-                "source_url": source_url,
+                "url": url,
                 "hash": doc_hash,
                 "title": metadata.get('title'),
-                "author": metadata.get('author'),
                 "published_at": metadata.get('published'),
-                "summary": metadata.get('summary'),
-                "status": "pending",
-                "meta": metadata
             } 
             response = self.client.table(self.documents_table)\
                                 .insert(data)\
@@ -107,27 +93,10 @@ class SupabaseManager:
                                 .execute()
             if response.data:
                 doc_id = response.data[0]['id']
-                print(f"Document created (pending): {doc_id} | {source_url}")
+                print(f"Document created (pending vectorial insertion): {doc_id} | {url}")
                 return doc_id
             return None           
         except Exception as e:
-           print(f"Error inserting docuement {doc_hash}: {e}")
+           print(f"Error inserting document {doc_hash}: {e}")
            return None
 
-    def update_source_status(self, doc_id, status, n_chunks = 0):
-        """Updates source status to either active or inactive"""
-        update_data = {
-            'status': status,
-            'updated_at': datetime.now().isoformat()
-        }
-        if status == "indexed":
-            update_data['n_chunks'] = n_chunks
-        
-        try:
-            self.client.table(self.documents_table)\
-                        .update(update_data)\
-                        .equal("id", doc_id)\
-                        .execute()
-            print(f"Document status updated: {doc_id} -> {status}")
-        except Exception as e:
-            print(f"Error updating document {doc_id} status: {e}")
