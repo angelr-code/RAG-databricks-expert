@@ -14,9 +14,8 @@ CREATE TABLE documents (
   source_id uuid REFERENCES sources(source_id) ON DELETE SET NULL,
   url text NOT NULL,
   title TEXT,
-  published_at timestamptz,
   hash text UNIQUE,
   n_chunks integer DEFAULT 0,
-  ingested_at timestamptz DEFAULT NULL,
-  updated_at timestamptz DEFAULT now()
+  created_at timestamptz DEFAULT now(),
+  ingested_at timestamptz DEFAULT NULL
 );

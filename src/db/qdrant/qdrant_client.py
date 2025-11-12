@@ -19,7 +19,11 @@ class QdrantStorage():
 
     def upsert(self, ids, vectors, payloads):
         points = [PointStruct(id = ids[i], vector = vectors[i], payload = payloads[i]) for i in range(len(ids))]
-        self.client.upsert(self.collection, points = points)
+        try:
+            self.client.upsert(self.collection, points = points)
+            print(f"Ingestion of {len(ids)} vectors to Qdrant completed")
+        except Exception as e:
+            print(f"Vector ingestion failed: {e}")
 
     def search(self, query_vector, top_k = 5):
         results = self.client.search(
