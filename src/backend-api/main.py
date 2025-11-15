@@ -1,10 +1,15 @@
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 
+from utils.logger import get_logger
+
 from db.qdrant.qdrant_client import QdrantStorage
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    logger = get_logger()
+    logger.info("Starting up the FastAPI application...")
+    
     qdrant = QdrantStorage()
     #sth before receiving requests 
     yield
