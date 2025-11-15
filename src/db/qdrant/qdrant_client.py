@@ -1,4 +1,4 @@
-from qdrant_client import QdrantClient
+from qdrant_client import AsyncQdrantClient
 from qdrant_client.models import VectorParams, Distance, PointStruct, Filter, FieldCondition, MatchValue
 import os
 
@@ -9,7 +9,7 @@ EMBEDDING_DIM = int(os.getenv("EMBEDDING_DIM", 384))
 
 class QdrantStorage():
     def __init__(self, url=QDRANT_URL, collection=QDRANT_COLLECTION, dim=EMBEDDING_DIM):
-        self.client = QdrantClient(url, timeout=15)
+        self.client = AsyncQdrantClient(url, timeout=15)
         self.collection = collection
         if not self.client.collection_exists(self.collection):
             self.client.create_collection(
@@ -17,7 +17,7 @@ class QdrantStorage():
                 vectors_config=VectorParams(size=dim, distance=Distance.COSINE)
             )
 
-    def upsert(self, ids, vectors, payloads):
+    async def upsert(self, ids, vectors, payloads):
         points = [PointStruct(id = ids[i], vector = vectors[i], payload = payloads[i]) for i in range(len(ids))]
         try:
             self.client.upsert(self.collection, points = points)
@@ -25,7 +25,7 @@ class QdrantStorage():
         except Exception as e:
             print(f"Vector ingestion failed: {e}")
 
-    def search(self, query_vector, top_k = 5):
+    async def search(self, query_vector, top_k = 5):
         results = self.client.search(
             collection_name=self.collection,
             query_vector=query_vector,
@@ -45,7 +45,7 @@ class QdrantStorage():
 
         return {"contexts": contexts, "sources": list(sources)}
     
-    def delete_by_document_id(self, document_id):
+    async def delete_by_document_id(self, document_id):
         """Deletes al vectors associated with a given document_id"""
         try:
             filter = Filter(
@@ -66,3 +66,5 @@ class QdrantStorage():
             print(f"Error deleting chunks for document {document_id}: {e}")
             return False
         
+    async def close(self):
+        self.client.close()
