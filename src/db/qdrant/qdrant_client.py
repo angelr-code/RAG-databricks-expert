@@ -25,12 +25,7 @@ class QdrantStorage():
     def __init__(self, url=QDRANT_URL, collection=QDRANT_COLLECTION, dim=EMBEDDING_DIM):
         self.client = AsyncQdrantClient(url, timeout=15)
         self.collection = collection
-        if not self.client.collection_exists(self.collection):
-            self.create_payload_index(field_name="title", field_type="text")
-            self.client.create_collection(
-                collection_name=self.collection,
-                vectors_config=VectorParams(size=dim, distance=Distance.COSINE)
-            )
+        self.dim = dim
 
     async def initialize(self):
         try:
@@ -39,7 +34,7 @@ class QdrantStorage():
             if not exists:
                 await self.client.create_collection(
                     collection_name=self.collection,
-                    vectors_config=VectorParams(size=dim, distance=Distance.COSINE)
+                    vectors_config=VectorParams(size=self.dim, distance=Distance.COSINE)
                 )
 
                 await self.create_payload_index(field_name="title", field_type="text")
