@@ -9,8 +9,9 @@ from db.qdrant.qdrant_client import QdrantStorage
 async def lifespan(app: FastAPI):
     logger = get_logger()
     logger.info("Starting up the FastAPI application...")
-    
+
     qdrant = QdrantStorage()
+    qdrant.initialize()
     #sth before receiving requests 
     yield
     #sth right after request response 

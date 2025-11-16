@@ -59,7 +59,9 @@ def load_documentation():
 
 @task
 def get_managers():
-    return SupabaseManager(), QdrantStorage()
+    vectorstore = QdrantStorage()
+    vectorstore.initialize()
+    return SupabaseManager(), vectorstore
 
 @task(cache_policy=NO_CACHE)
 def get_source_id(db: SupabaseManager, source_name: str) -> str:
