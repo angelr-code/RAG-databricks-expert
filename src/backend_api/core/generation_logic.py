@@ -46,6 +46,7 @@ def build_prompt(query_text: str, contexts: SearchResult, max_tokens: int) -> st
 
 @opik.track(name="generate_answer")
 async def generate_answer(query_request: QueryRequest, search_result: SearchResult, user_api_key: str | None = None) -> QueryResponse:
+
     selected_model = query_request.model or "gpt-4o-mini"
     config = ModelConfig(requested_model=selected_model)
 
@@ -53,8 +54,7 @@ async def generate_answer(query_request: QueryRequest, search_result: SearchResu
     
     if query_request.provider == "openai":
         logger.info("OpenAI provider selected for generation...")
-        answer = await generate_openai(prompt, config, user_api_key)
-        return answer
+        answer_text, model_used = await generate_openai(prompt, config, user_api_key)
     elif query_request.provider == "OpenRouter":
         logger.info("OpenRouter provider selected for generation...")
         # Here I would implement the OpenRouter generation logic
@@ -64,7 +64,9 @@ async def generate_answer(query_request: QueryRequest, search_result: SearchResu
     response = QueryResponse(
         query_text=query_request.query_text,
         provider=query_request.provider,
-        model=selected_model,
-        answer=answer,
+        model=model_used,
+        answer=answer_text,
         sources=list(search_result.sources)
     )
+
+    return response

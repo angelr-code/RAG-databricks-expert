@@ -1,6 +1,7 @@
 import os
 import uuid
 import hashlib
+import asyncio
 from bs4 import BeautifulSoup
 from prefect import flow, task, unmapped
 from prefect.cache_policies import NO_CACHE
@@ -8,8 +9,8 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import SitemapLoader
 from langchain_huggingface import HuggingFaceEmbeddings
 
-from db.supabase.supabase_client import SupabaseManager
-from db.qdrant.qdrant_client import QdrantStorage
+from src.db.supabase.supabase_client import SupabaseManager
+from src.db.qdrant.qdrant_client import QdrantStorage
 
 # Method from langchain docs to extract cleaner content 
 def remove_nav_and_header_elements(content: BeautifulSoup) -> str:
@@ -46,21 +47,21 @@ def extract_title(document):
     
 
 @task
-def load_documentation():
+async def load_documentation():
     """Loads all the documentation once"""
     loader = SitemapLoader(
         "https://docs.databricks.com/en/doc-sitemap.xml",
-        filter_urls=["https://docs.databricks.com/aws/en/"],
+        filter_urls=["https://docs.databricks.com/aws/en/delta-sharing"],
         parsing_function=remove_nav_and_header_elements
     )
-    docs = loader.load()
+    docs = await asyncio.to_thread(loader.load) # Trick with asyncio to run sync code
     print(f"{len(docs)} documents loaded.")
     return docs
 
 @task
-def get_managers():
+async def get_managers():
     vectorstore = QdrantStorage()
-    vectorstore.initialize()
+    await vectorstore.initialize()
     return SupabaseManager(), vectorstore
 
 @task(cache_policy=NO_CACHE)
@@ -80,7 +81,7 @@ def get_embedding_model(model_name = "all-MiniLM-L6-v2"):
     return HuggingFaceEmbeddings(model_name=model_name)
 
 @task(retries=2, retry_delay_seconds=5, cache_policy=NO_CACHE)
-def process_document(document, db: SupabaseManager, qdrant: QdrantStorage, source_id: str, text_splitter: RecursiveCharacterTextSplitter, embedding_model: HuggingFaceEmbeddings):
+async def process_document(document, db: SupabaseManager, qdrant: QdrantStorage, source_id: str, text_splitter: RecursiveCharacterTextSplitter, embedding_model: HuggingFaceEmbeddings):
     """Saves documents metadata in Supabase and prepares for Qdrant ingestion"""
     url = document.metadata.get('source')
     content = document.page_content
@@ -111,7 +112,7 @@ def process_document(document, db: SupabaseManager, qdrant: QdrantStorage, sourc
         print("Updated document")
         doc_id = existing_doc['id']
 
-        qdrant.delete_by_document_id(doc_id)
+        await qdrant.delete_by_document_id(doc_id)
         status = 'update'
     else:
         return None
@@ -143,7 +144,7 @@ def process_document(document, db: SupabaseManager, qdrant: QdrantStorage, sourc
     }
 
 @task(cache_policy=NO_CACHE)
-def aggregate_and_ingest(results: list[dict | None], qdrant: QdrantStorage, db: SupabaseManager) -> dict:
+async def aggregate_and_ingest(results: list[dict | None], qdrant: QdrantStorage, db: SupabaseManager) -> dict:
     all_ids = []
     all_vectors = []
     all_payloads = []
@@ -157,7 +158,7 @@ def aggregate_and_ingest(results: list[dict | None], qdrant: QdrantStorage, db: 
             indicators.append((res['doc_id'], res['status'], res['new_hash'], res['n_chunks']))
 
     if all_ids:
-        qdrant.upsert(all_ids, all_vectors, all_payloads)
+        await qdrant.upsert(all_ids, all_vectors, all_payloads)
     else:
         print("There are no new vectors to insert.")
 
@@ -169,13 +170,13 @@ def aggregate_and_ingest(results: list[dict | None], qdrant: QdrantStorage, db: 
 
 
 @flow(name="Static Databricks Documentation Ingestion")
-def static_load_flow():
-    db, qdrant = get_managers()
+async def static_load_flow():
+    db, qdrant = await get_managers()
     splitter = get_text_splitter()
     model = get_embedding_model()
     source_id = get_source_id(db, "Databricks Docs")
 
-    docs = load_documentation()
+    docs = await load_documentation()
 
     print("Mapping documents processing")
     results = process_document.map(
@@ -187,8 +188,8 @@ def static_load_flow():
         embedding_model=unmapped(model)
     )
     
-    aggregate_and_ingest(results, qdrant, db)
+    await aggregate_and_ingest(results, qdrant, db)
 
 
 if __name__ == "__main__":
-    static_load_flow()
+    asyncio.run(static_load_flow())

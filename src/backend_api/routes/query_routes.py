@@ -29,7 +29,7 @@ async def response_generation(
     )
 
     response = await generate_answer(
-        query_req=query_request,
+        query_request=query_request,
         search_result=search_result,
         user_api_key=user_api_key
     )

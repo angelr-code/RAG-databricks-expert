@@ -1,6 +1,6 @@
 from collections.abc import AsyncGenerator
 
-from openai import AsyncOpenAI
+from openai import AsyncOpenAI, AuthenticationError, OpenAIError
 from openai.types.chat import ChatCompletionSystemMessageParam
 from opik.integrations.openai import track_openai
 
@@ -21,19 +21,27 @@ async def generate_openai(prompt: str, config: ModelConfig, api_key: str | None)
     Returns:
         str: The generated response text.
     """
-    openai_client = AsyncOpenAI(api_key=api_key)
-    tracked_openai_client = track_openai(openai_client)
+    try:
+        openai_client = AsyncOpenAI(api_key=api_key)
+        tracked_openai_client = track_openai(openai_client)
 
-    response = await tracked_openai_client.chat.completions.create(
-        model=config.requested_model,
-        messages=[
-            ChatCompletionSystemMessageParam(role="user",content=prompt)
-        ],
-        temperature=config.temperature,
-        max_completion_tokens=config.max_completion_tokens
-    )
+        response = await tracked_openai_client.chat.completions.create(
+            model=config.requested_model,
+            messages=[
+                ChatCompletionSystemMessageParam(role="user",content=prompt)
+            ],
+            temperature=config.temperature,
+            max_completion_tokens=config.max_completion_tokens
+        )
 
-    return response.choices[0].message.content 
+        content = response.choices[0].message.content
+        model_used = response.model 
+
+        return content, model_used
+    except AuthenticationError as e:
+        logger.error("Authentication error with OpenAI API. Please check your API key.")
+    except OpenAIError as e:
+        logger.error(f"OpenAI API error: {e}")
 
 def stream_openai(prompt: str, config: ModelConfig, api_key: str | None = None) -> AsyncGenerator[str, None]:
     """
