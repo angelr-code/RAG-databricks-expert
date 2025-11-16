@@ -14,3 +14,7 @@ class QueryResponse(BaseModel): # need to check
     answer: str = Field(default="", description="Generated response")
     sources: list = Field(default_factory=[], description="List of queried sources used in the generation")
     finish_reason: str | None = Field(default=None, description="The reason why the generation finished, if available")
+
+class SearchResult(BaseModel):
+    contexts: list = Field(default_factory=[], description="List of retrieved contexts from the Vector DB")
+    sources: list = Field(default_factory=[], description="List of source URLs associated with the contexts")
