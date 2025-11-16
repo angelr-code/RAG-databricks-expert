@@ -1,13 +1,11 @@
-from collections.abc import AsyncGenerator
-
 import opik
 
-from models.api_models import SearchResult, QueryRequest, QueryResponse
-from models.provider_models import ModelConfig
-from src.utils.logger import get_logger
-from core.utils.openai_provider import generate_openai, stream_openai
+from src.backend_api.models.api_models import SearchResult, QueryRequest, QueryResponse
+from src.backend_api.models.provider_models import ModelConfig
+from src.utils.logger import setup_logging
+from src.backend_api.core.utils.openai_provider import generate_openai, stream_openai
 
-logger = get_logger()
+logger = setup_logging()
 
 PROMPT = """
 You are a skilled technical assistant specialized in Databricks.

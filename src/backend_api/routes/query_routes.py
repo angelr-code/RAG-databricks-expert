@@ -1,10 +1,9 @@
 from fastapi import APIRouter, Request, Header
 
-from models.api_models import QueryRequest, QueryResponse
-from core.generation_logic import generate_answer
-from core.search_logic import query
+from src.backend_api.models.api_models import QueryRequest, QueryResponse
+from src.backend_api.core.generation_logic import generate_answer
 
-from core.search_logic import search_service
+from src.backend_api.core.search_logic import search_service
 
 router = APIRouter()
 

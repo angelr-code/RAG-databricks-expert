@@ -2,13 +2,13 @@ import opik
 
 from fastapi.concurrency import run_in_threadpool
 
-from models.api_models import SearchResult
-from db.qdrant.qdrant_client import QdrantStorage
+from src.backend_api.models.api_models import SearchResult
+from src.db.qdrant.qdrant_client import QdrantStorage
 from langchain_huggingface import HuggingFaceEmbeddings
 
-from src.utils.logger import get_logger
+from src.utils.logger import setup_logging
 
-logger = get_logger()
+logger = setup_logging()
 
 @opik.track(name="rag_retrieval")
 async def search_service(query_text: str, vectorstore: QdrantStorage, embedding_model: HuggingFaceEmbeddings, keywords: str | None = None, limit: int = 5) -> SearchResult:

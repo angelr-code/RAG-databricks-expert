@@ -4,10 +4,10 @@ from openai import AsyncOpenAI
 from openai.types.chat import ChatCompletionSystemMessageParam
 from opik.integrations.openai import track_openai
 
-from models.provider_models import ModelConfig
-from src.utils.logger import get_logger
+from src.backend_api.models.provider_models import ModelConfig
+from src.utils.logger import setup_logging
 
-logger = get_logger()
+logger = setup_logging()
 
 async def generate_openai(prompt: str, config: ModelConfig, api_key: str | None) -> str: 
     """
