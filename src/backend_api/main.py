@@ -3,15 +3,15 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from db.qdrant.qdrant_client import QdrantStorage
+from src.db.qdrant.qdrant_client import QdrantStorage
 from langchain_huggingface import HuggingFaceEmbeddings
 
 from routes.query_routes import router as query_router
 from routes.health_routes import router as health_router
 
-from utils.logger import get_logger
+from utils.logger import setup_logging
 
-logger = get_logger()
+logger = setup_logging()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -54,7 +54,7 @@ if __name__ == '__main__':
     import uvicorn
     port = int(os.getenv("PORT", 8000))
     uvicorn.run(
-        "src.api.main:app",
+        "src.backend-api.main:app",
         host="0.0.0.0",
         port=port,
         log_level="info",

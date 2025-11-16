@@ -18,7 +18,7 @@ from qdrant_client.models import (
     MatchText
 )
 
-from utils.logger import setup_logging
+from src.utils.logger import setup_logging
 
 logger = setup_logging()
 
