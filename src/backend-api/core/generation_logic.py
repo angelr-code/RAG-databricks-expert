@@ -2,7 +2,7 @@ from collections.abc import AsyncGenerator
 
 import opik
 
-from models.api_models import SearchResult
+from models.api_models import SearchResult, QueryRequest, QueryResponse
 from models.provider_models import ModelConfig
 from src.utils.logger import get_logger
 from core.utils.openai_provider import generate_openai, stream_openai
@@ -34,29 +34,39 @@ which are retrieved from a vector database, without relying on outside knowledge
 ### Final Answer:
 """
 
-def build_prompt(query_text: str, contexts: SearchResult, tokens: int = 5000):
-    contexts = "\n\n".join(
-        (
-            f"- URL: {document.source}"
-            f" Content: {document.context}"
-        ) for document in contexts
-    )
+def build_prompt(query_text: str, contexts: SearchResult, max_tokens: int) -> str:
+    contexts_list = [
+        f"- URL: {source}\n Content: {context}" for source, context in zip(contexts.sources, contexts.contexts)
+    ]
+    contexts = "\n\n".join(contexts_list)
 
     return PROMPT.format(
         query = query_text,
         context_texts=contexts,
-        tokens=tokens
+        tokens=max_tokens
     )
 
 @opik.track(name="generate_answer")
-async def generate_answer(query_text: str, contexts: SearchResult, provider: str = "openai", selected_model: str | None = None):
-    prompt = build_prompt(query_text, contexts)
-    config = ModelConfig(primary_model="gpt-4o-mini")
+async def generate_answer(query_request: QueryRequest, search_result: SearchResult, user_api_key: str | None = None) -> QueryResponse:
+    selected_model = query_request.model or "gpt-4o-mini"
+    config = ModelConfig(requested_model=selected_model)
 
-    answer, model_used = await generate_openai(prompt, config=config)
+    prompt = build_prompt(query_request.query_text, search_result, config.max_completion_tokens)
+    
+    if query_request.provider == "openai":
+        logger.info("OpenAI provider selected for generation...")
+        answer = await generate_openai(prompt, config, user_api_key)
+        return answer
+    elif query_request.provider == "OpenRouter":
+        logger.info("OpenRouter provider selected for generation...")
+        # Here I would implement the OpenRouter generation logic
+    else:
+        raise ValueError(f"Unsupported provider: {query_request.provider}")
 
-    return {
-        "answer": answer,
-        "sources": [document.url for document in contexts],
-        "model": model_used,
-    }
+    response = QueryResponse(
+        query_text=query_request.query_text,
+        provider=query_request.provider,
+        model=selected_model,
+        answer=answer,
+        sources=list(search_result.sources)
+    )
