@@ -1,5 +1,3 @@
-import os 
-
 from collections.abc import AsyncGenerator
 
 from openai import AsyncOpenAI
@@ -11,22 +9,21 @@ from src.utils.logger import get_logger
 
 logger = get_logger()
 
-openai_api_key = os.getenv("OPENAI_API_KEY", "")
-async_openai_client = AsyncOpenAI(api_key=openai_api_key)
-
-os.environ["OPENAI_API_KEY"] = openai_api_key  # Ensure the environment variable is set for opik
-tracked_openai_client = track_openai(async_openai_client)
-
-async def generate_openai(prompt: str, config: ModelConfig): 
-    """Generate a response from OpenAI for a given prompt and model configuration.
+async def generate_openai(prompt: str, config: ModelConfig, api_key: str | None) -> str: 
+    """
+    Generate a response from OpenAI for a given prompt and model configuration.
 
     Args:
         prompt (str): The input prompt.
         config (ModelConfig): The model configuration.
+        api_key (str | None): The user's API key for OpenAI.
         
     Returns:
         str: The generated response text.
     """
+    openai_client = AsyncOpenAI(api_key=api_key)
+    tracked_openai_client = track_openai(openai_client)
+
     response = await tracked_openai_client.chat.completions.create(
         model=config.requested_model,
         messages=[
@@ -38,16 +35,20 @@ async def generate_openai(prompt: str, config: ModelConfig):
 
     return response.choices[0].message.content 
 
-def stream_openai(prompt: str, config: ModelConfig) -> AsyncGenerator[str, None]:
-    """Stream a response from OpenAI for a given prompt and model configuration.
+def stream_openai(prompt: str, config: ModelConfig, api_key: str | None = None) -> AsyncGenerator[str, None]:
+    """
+    Stream a response from OpenAI for a given prompt and model configuration.
 
     Args:
         prompt (str): The input prompt.
         config (ModelConfig): The model configuration.
+        api_key (str | None): The user's API key for OpenAI.
 
     Returns:
         AsyncGenerator[str, None]: An asynchronous generator yielding response chunks.
     """
+    openai_client = AsyncOpenAI(api_key=api_key)
+    tracked_openai_client = track_openai(openai_client)
 
     async def gen() -> AsyncGenerator[str, None]:
         stream = await tracked_openai_client.chat.completions.create(
