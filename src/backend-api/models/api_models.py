@@ -1,4 +1,5 @@
 from pydantic import BaseModel, Field
+from typing import List, Optional, Dict
 
 class QueryRequest(BaseModel):
     query_text: str = Field(default="", description="The user input text")
@@ -16,5 +17,5 @@ class QueryResponse(BaseModel): # need to check
     finish_reason: str | None = Field(default=None, description="The reason why the generation finished, if available")
 
 class SearchResult(BaseModel):
-    contexts: list = Field(default_factory=[], description="List of retrieved contexts from the Vector DB")
-    sources: list = Field(default_factory=[], description="List of source URLs associated with the contexts")
+    contexts: List[str] = Field(default_factory=list, description="List of retrieved contexts from the Vector DB")
+    sources: List[str] = Field(default_factory=list, description="List of source URLs associated with the contexts")

@@ -1,20 +1,40 @@
 import opik
-from fastapi import Request
 
-from loguru import logger
+from fastapi.concurrency import run_in_threadpool
 
 from models.api_models import SearchResult
-
 from db.qdrant.qdrant_client import QdrantStorage
+from langchain_huggingface import HuggingFaceEmbeddings
 
-@opik.track
-async def query(request: Request,query_text: str = "",keywords: str | None = None, limit: int = 5) -> SearchResult:
+from src.utils.logger import get_logger
+
+logger = get_logger()
+
+@opik.track(name="rag_retrieval")
+async def search_service(query_text: str, vectorstore: QdrantStorage, embedding_model: HuggingFaceEmbeddings, keywords: str | None = None, limit: int = 5) -> SearchResult:
+    """
+    Performs a search in the Vector DB based on the query_text and optional keywords.
+
+    Args:
+        query_text (str): The user input text to search for.
+        vectorstore (QdrantStorage): The vector storage instance to perform the search on.
+        embedding_model (HuggingFaceEmbeddings): The embedding model to convert text to vectors
+        keywords (str | None): Optional keywords to filter the search results.
+        limit (int): The maximum number of chunks to retrieve.
+    Returns:
+        SearchResult: An object containing the retrieved contexts and their associated sources.
+    """
     logger.info(f"Received search request with query_text: '{query_text}', keywords: '{keywords}', limit: {limit}")
-    vectorstore: QdrantStorage = request.app.state.vectorstore
-    embedding_model = request.app.state.embedding_model
 
-    query_vector = embedding_model.encode_text(query_text)
+    query_vector = await run_in_threadpool(embedding_model.embed_query, query_text)
     search_results = await vectorstore.search(query_vector, keywords, top_k=limit)
 
     logger.info(f"Search completed. Returning {len(search_results['contexts'])} associated contexts.")
-    return search_results
+
+    result = SearchResult(
+        contexts=search_results['contexts'],
+        sources=search_results['sources']
+    )
+
+    logger.info(f"Retrieval phase completed successfully. Found {len(result.contexts)} matching contexts.")
+    return result
