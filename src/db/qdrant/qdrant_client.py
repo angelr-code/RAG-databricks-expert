@@ -39,7 +39,7 @@ class QdrantStorage():
 
         Args:
             field_name (str): The name of the field to index.
-            field_type (str): The type of the field ("text" or "keyword").
+            field_type (str): The type of the field.
         """
         try:
             if field_type == "text":
@@ -93,7 +93,14 @@ class QdrantStorage():
             raise
 
     async def upsert(self, ids: List[str], vectors: List[List[float]], payloads: List[Dict[str, Any]]):
-        """Upserts vectors and their associated payloads into the Qdrant collection."""
+        """
+        Upserts vectors and their associated payloads into the Qdrant collection.
+        
+        Args:
+            ids (List[str]): List of unique identifiers for the vectors.
+            vectors (List[List[float]]): List of vectors to be upserted.
+            payloads (List[Dict[str, Any]]): List of payloads associated with each vector.
+        """
         points = [PointStruct(id = ids[i], vector = vectors[i], payload = payloads[i]) for i in range(len(ids))]
         try:
             await self.client.upsert(self.collection, points = points)
@@ -102,7 +109,8 @@ class QdrantStorage():
             logger.error(f"Vector ingestion failed: {e}")
 
     async def search(self, query_vector: List[float], keywords: Optional[str], top_k: int = 5) -> Dict[str, Any]:
-        """Searches for the most similar vectors in the Qdrant collection based on the query vector and optional keywords.
+        """
+        Searches for the most similar vectors in the Qdrant collection based on the query vector and optional keywords.
         
         Args:
             query_vector (List[float]): The vector to search for similar vectors.
@@ -144,7 +152,15 @@ class QdrantStorage():
         return {"contexts": contexts, "sources": list(sources)}
     
     async def delete_by_document_id(self, document_id: str) -> bool:
-        """Deletes al vectors associated with a given document_id"""
+        """
+        Deletes al vectors associated with a given document_id
+        
+        Args:
+            document_id (str): The ID of the document whose vectors are to be deleted.
+            
+        Returns:
+            bool: True if deletion was successful, False otherwise.
+        """
         try:
             filter = Filter(
                 must=[
@@ -169,3 +185,4 @@ class QdrantStorage():
         """Closes the Qdrant client connection."""
         await self.client.close()
         logger.info("Qdrant client connection closed.")
+    
