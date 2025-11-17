@@ -92,13 +92,14 @@ async def process_document(document, db: SupabaseManager, qdrant: QdrantStorage,
     
     new_hash = hashlib.sha256(content.encode('utf-8')).hexdigest()
 
-    existing_doc = db.get_document_by_url(url)
+    existing_doc = await asyncio.to_thread(db.get_document_by_url, url)
 
     title = extract_title(document)
 
     if existing_doc is None:
         print(f"New document: {url}")
-        doc_id = db.insert_document(
+        doc_id = await asyncio.to_thread(
+            db.insert_document,
             source_id=source_id,
             url=url,
             title=title,
@@ -118,7 +119,7 @@ async def process_document(document, db: SupabaseManager, qdrant: QdrantStorage,
         return None
     
     chunks = text_splitter.split_text(content)
-    vectors = embedding_model.embed_documents(chunks)
+    vectors = asyncio.to_thread(embedding_model.embed_documents, chunks)
     if len(chunks) != len(vectors) or not vectors:
         print(f"[ERROR] Disparidad en chunks/vectores para {url}. Chunks: {len(chunks)}, Vectores: {len(vectors)}")
         return None
