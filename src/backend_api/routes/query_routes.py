@@ -18,13 +18,10 @@ async def response_generation(
     )
 ) -> QueryResponse:
     vectorstore = request.app.state.vectorstore
-    embedding_model = request.app.state.embedding_model
 
     search_result = await search_service(
         query_text=query_request.query_text,
         vectorstore=vectorstore,
-        embedding_model=embedding_model,
-        keywords=query_request.keywords,
         limit=query_request.limit
     )
 

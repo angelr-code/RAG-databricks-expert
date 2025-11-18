@@ -1,6 +1,10 @@
 import os
+import asyncio
+import uuid
 
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
+
+from fastembed import TextEmbedding, SparseTextEmbedding
 
 from qdrant_client import AsyncQdrantClient
 from qdrant_client.models import (
@@ -10,15 +14,18 @@ from qdrant_client.models import (
     Filter, 
     FieldCondition, 
     MatchValue,
-    TextIndexParams, 
-    TextIndexType,
     KeywordIndexParams,
     KeywordIndexType,
-    TokenizerType,
-    MatchText
+    SparseVectorParams,
+    SparseIndexParams,
+    Prefetch,
+    FusionQuery,
+    Fusion
 )
 
 from src.utils.logger import setup_logging
+
+from src.backend_api.models.api_models import SearchResult
 
 logger = setup_logging()
 
@@ -32,46 +39,14 @@ class QdrantStorage():
         self.client = AsyncQdrantClient(url, timeout=15)
         self.collection = collection
         self.dim = dim
-
-    async def create_payload_index(self, field_name: str, field_type: str = "text"):
-        """
-        Creates a payload index on the specified field.
-
-        Args:
-            field_name (str): The name of the field to index.
-            field_type (str): The type of the field.
-        """
-        try:
-            if field_type == "text":
-                # This will be the default use with the field 'title'
-                schema_params = TextIndexParams(
-                    type=TextIndexType.TEXT,
-                    tokenizer=TokenizerType.WORD, # Split words palabras
-                    min_token_len=3,              # Ignores short words
-                    lowercase=True           
-                )
-            else:
-                # If it's not text (e.g. int) -> exact match
-                schema_params = KeywordIndexParams(type=KeywordIndexType.KEYWORD)
-
-            await self.client.create_payload_index(
-                collection_name=self.collection,
-                field_name=field_name,
-                field_schema=schema_params,
-                wait=True 
-            )
-            logger.info(f"Payload index created successfully for: {field_name}")
-
-        except Exception as e:
-            if "already exists" in str(e):
-                logger.info(f"Index for '{field_name}' already exists. Pass.")
-            else:
-                logger.error(f"Error creating payload index for field '{field_name}': {e}")
+        self.dense_model = TextEmbedding(model_name="BAAI/bge-small-en-v1.5")
+        self.sparse_model = SparseTextEmbedding(model_name="prithivida/Splade_PP_en_v1")
 
     async def initialize(self):
         """
-        Initializes the Qdrant collection in an asynchronous manner.
-        Creates the collection if it does not exist and sets up necessary payload indexes.
+        Initializes the Qdrant collection in an asynchronous manner with hybrid vector configuration.
+        Creates the collection if it does not exist and sets up a doc_id payload index to make operations
+        like deletes faster.
         """
         try:
             exists = await self.client.collection_exists(self.collection)
@@ -79,11 +54,30 @@ class QdrantStorage():
             if not exists:
                 await self.client.create_collection(
                     collection_name=self.collection,
-                    vectors_config=VectorParams(size=self.dim, distance=Distance.COSINE)
+                    vectors_config={
+                        "dense_vector": VectorParams(
+                            size=self.dim, 
+                            distance=Distance.COSINE
+                        )
+                    },
+                    sparse_vectors_config={
+                        "sparse_vector": SparseVectorParams(
+                            index=SparseIndexParams(
+                                on_disk=False
+                            )
+                        )
+                    }
                 )
 
-                await self.create_payload_index(field_name="title", field_type="text")
-                logger.info(f"Collection '{self.collection}' created successfully in Qdrant")
+                await self.client.create_payload_index(
+                    collection_name=self.collection,
+                    field_name="document_id", 
+                    field_schema=KeywordIndexParams(
+                        type=KeywordIndexType.KEYWORD
+                    ),
+                    wait=True
+                )
+                logger.info(f"Collection '{self.collection}' created successfully in Qdrant with Hybrid Vector Configuration")
 
             else: 
                 logger.info("Qdrant collection already exists")
@@ -92,64 +86,86 @@ class QdrantStorage():
             logger.error(f"Error initializing Qdrant: {e}")
             raise
 
-    async def upsert(self, ids: List[str], vectors: List[List[float]], payloads: List[Dict[str, Any]]):
+    async def upsert(self, chunks: List[str], metadatas: List[Dict[str, Any]]):
         """
-        Upserts vectors and their associated payloads into the Qdrant collection.
-        
+        Upserts the given chunks and their associated metadata into the Qdrant collection.
+
         Args:
-            ids (List[str]): List of unique identifiers for the vectors.
-            vectors (List[List[float]]): List of vectors to be upserted.
-            payloads (List[Dict[str, Any]]): List of payloads associated with each vector.
+            chunks (List[str]): The list of text chunks to be upserted.
+            metadatas (List[Dict[str, Any]]): The list of metadata dictionaries associated with each chunk.
         """
-        points = [PointStruct(id = ids[i], vector = vectors[i], payload = payloads[i]) for i in range(len(ids))]
         try:
-            await self.client.upsert(self.collection, points = points)
-            logger.info(f"Ingestion of {len(ids)} vectors to Qdrant completed")
+            dense_vectors = await asyncio.to_thread(lambda: list(self.dense_model.embed(chunks)))
+            sparse_vectors = await asyncio.to_thread(lambda: list(self.sparse_model.embed(chunks)))
+            
+            points = [PointStruct(id = str(uuid.uuid4()), 
+                                  vector = {
+                                      "dense_vector": list(dense_vectors[i]),
+                                      "sparse_vector": sparse_vectors[i]
+                                  }, 
+                                  payload = {
+                                      "text": chunks[i],
+                                      **metadatas[i]
+                                  }
+                                ) 
+                    for i in range(len(chunks))]
+
+            await self.client.upsert(collection_name=self.collection, points = points)
+
+            logger.info(f"Ingestion of {len(chunks)} vectors to Qdrant completed")
         except Exception as e:
             logger.error(f"Vector ingestion failed: {e}")
+            raise
 
-    async def search(self, query_vector: List[float], keywords: Optional[str], top_k: int = 5) -> Dict[str, Any]:
+    async def hybrid_search(self, query_text: str, top_k: int = 5) -> SearchResult:
         """
-        Searches for the most similar vectors in the Qdrant collection based on the query vector and optional keywords.
-        
+        Performs a hybrid search (dense + sparse) in the Qdrant collection based on the query_text.
+        Uses RRF (Reciprocal Rank Fusion) to combine results from both searches retrieving the most 
+        relevant ones in both semantic and keyword aspects.
+
         Args:
-            query_vector (List[float]): The vector to search for similar vectors.
-            keywords (Optional[str]): Optional keywords to filter the search results.
-            top_k (int): The number of top similar vectors to retrieve.
-        
+            query_text (str): The user input text to search for.
+            top_k (int): The maximum number of chunks to retrieve.
         Returns:
-            Dict[str, Any]: A dictionary containing the contexts and sources of the search results.
+            Dict[str, Any]: A dictionary containing the retrieved contexts and their associated sources.
         """
-        query_filter = None
-        if keywords:
-            query_filter = Filter(
-                must=[
-                    FieldCondition(
-                    key="title",
-                    match=MatchText(text=keywords)
-                    )
-                ]
-            )
+        query_dense = list(self.dense_model.embed([query_text]))[0]
+        query_sparse = list(self.sparse_model.embed([query_text]))[0]
 
-        results = await self.client.search(
+        # We perform hybrid search for the result to have both conceptual meaning and the adequate technical terms
+        results = await self.client.query_points(
             collection_name=self.collection,
-            query_vector=query_vector,
-            query_filter=query_filter,
+            prefetch=[
+                Prefetch(
+                    query=list(query_dense),
+                    using="dense_vector",
+                    limit=top_k * 2
+                ),
+                Prefetch(
+                    query=query_sparse,
+                    using="sparse_vector",
+                    limit=top_k * 2
+                )
+            ],  # We perform two searches (hybrid search): dense (semantic) and sparse (keyword)
+            query=FusionQuery(fusion=Fusion.RRF), # Reciprocal Rank Fusion is the algorithm used to combine results. 
             with_payload=True,
             limit=top_k
         )
+
         contexts = []
         sources = set() # set in order to not repeat sources
-
-        for r in results:
-            payload = getattr(r, "payload", None) or {}
+        for result in results.points:
+            payload = result.payload
             text = payload.get("text", "")
             source = payload.get("source_url", "")
             if source:
                 contexts.append(text)
                 sources.add(source)
 
-        return {"contexts": contexts, "sources": list(sources)}
+        return SearchResult(
+            contexts=contexts,
+            sources=list(sources)
+        )
     
     async def delete_by_document_id(self, document_id: str) -> bool:
         """

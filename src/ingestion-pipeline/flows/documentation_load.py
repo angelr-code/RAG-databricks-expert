@@ -1,13 +1,16 @@
 import os
-import uuid
-import hashlib
 import asyncio
+import hashlib
+
+from typing import Dict, List
+
 from bs4 import BeautifulSoup
-from prefect import flow, task, unmapped
-from prefect.cache_policies import NO_CACHE
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import SitemapLoader
-from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_core.documents import Document
+
+from prefect import flow, task, unmapped
+from prefect.cache_policies import NO_CACHE
 
 from src.db.supabase.supabase_client import SupabaseManager
 from src.db.qdrant.qdrant_client import QdrantStorage
@@ -25,8 +28,20 @@ def remove_nav_and_header_elements(content: BeautifulSoup) -> str:
     return str(content.get_text())
 
 @task
-def extract_title(document):
-    """Tries to extract the document page title in 3 ways"""
+def extract_title(document: Document) -> str:
+    """
+    Tries to extract the document page title in 3 ways
+    
+    1. From metadata 'title' field
+    2. From the first line of the content
+    3. From the URL
+
+    Args:
+        document (Document): The document object to extract the title from.
+
+    Returns:
+        str: The extracted title.
+    """
     # using metadata
     title = document.metadata.get('title')
     if title:
@@ -47,7 +62,7 @@ def extract_title(document):
     
 
 @task
-async def load_documentation():
+async def load_documentation() -> List[Document]:
     """Loads all the documentation once"""
     loader = SitemapLoader(
         "https://docs.databricks.com/en/doc-sitemap.xml",
@@ -59,14 +74,22 @@ async def load_documentation():
     return docs
 
 @task
-async def get_managers():
+async def get_managers() -> tuple[SupabaseManager, QdrantStorage]:
+    """Initializes and returns the Supabase and Qdrant managers."""
     vectorstore = QdrantStorage()
     await vectorstore.initialize()
     return SupabaseManager(), vectorstore
 
 @task(cache_policy=NO_CACHE)
 def get_source_id(db: SupabaseManager, source_name: str) -> str:
-    """Obtains the UUID from the source 'Databricks Docs'."""
+    """Obtains the UUID from the source 'Databricks Docs'.
+    
+    Args:
+        db (SupabaseManager): The Supabase manager instance.
+        source_name (str): The name of the source to look for.
+    Returns:
+        str: The UUID of the source.
+    """
     source = db.get_source_by_name(source_name) 
     if not source:
         raise ValueError(f"Source '{source_name}' not found in the DB.")
@@ -76,13 +99,22 @@ def get_source_id(db: SupabaseManager, source_name: str) -> str:
 def get_text_splitter(chunk_size = 1000, chunk_overlap = 200):
     return RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
 
-@task 
-def get_embedding_model(model_name = "all-MiniLM-L6-v2"):
-    return HuggingFaceEmbeddings(model_name=model_name)
-
 @task(retries=2, retry_delay_seconds=5, cache_policy=NO_CACHE)
-async def process_document(document, db: SupabaseManager, qdrant: QdrantStorage, source_id: str, text_splitter: RecursiveCharacterTextSplitter, embedding_model: HuggingFaceEmbeddings):
-    """Saves documents metadata in Supabase and prepares for Qdrant ingestion"""
+async def process_document(document, db: SupabaseManager, qdrant: QdrantStorage, source_id: str, text_splitter: RecursiveCharacterTextSplitter) -> Dict | None:
+    """
+    Processes a single document: checks for new or updated content, splits into chunks, and prepares metadata.
+
+    Args:
+        document (Document): The document to be processed.
+        db (SupabaseManager): The Supabase manager instance.
+        qdrant (QdrantStorage): The Qdrant storage instance.
+        source_id (str): The source ID associated with the document.
+        text_splitter (RecursiveCharacterTextSplitter): The text splitter instance.
+    
+    Returns:
+        dict | None: A dictionary containing document ID, chunks, metadatas, action type, new hash, and number of chunks,
+                      or None if the document is unchanged.
+    """
     url = document.metadata.get('source')
     content = document.page_content
 
@@ -105,7 +137,7 @@ async def process_document(document, db: SupabaseManager, qdrant: QdrantStorage,
             title=title,
             doc_hash= new_hash
         )
-        status = 'new'
+        action = 'new'
         if not doc_id:
             return None
     elif existing_doc['hash'] != new_hash:
@@ -114,52 +146,50 @@ async def process_document(document, db: SupabaseManager, qdrant: QdrantStorage,
         doc_id = existing_doc['id']
 
         await qdrant.delete_by_document_id(doc_id)
-        status = 'update'
+        action = 'update'
     else:
         return None
     
     chunks = text_splitter.split_text(content)
-    vectors = asyncio.to_thread(embedding_model.embed_documents, chunks)
-    if len(chunks) != len(vectors) or not vectors:
-        print(f"[ERROR] Disparidad en chunks/vectores para {url}. Chunks: {len(chunks)}, Vectores: {len(vectors)}")
-        return None
-    ids = [str(uuid.uuid4()) for _ in chunks]
-    payloads = [
+    metadatas = [
         {
             "document_id": doc_id,
             "source_url": url,
-            "text": chunk,
             "title": title
         }
-        for chunk in chunks
+        for _ in chunks
     ]
 
     return {
         "doc_id": doc_id,
-        "ids": ids,
-        "vectors": vectors,
-        "payloads": payloads,
-        "status": status,
+        "chunks": chunks,
+        "metadatas": metadatas,
+        "action": action,
         "new_hash": new_hash,
-        "n_chunks": len(ids)
+        "n_chunks": len(chunks)
     }
 
 @task(cache_policy=NO_CACHE)
-async def aggregate_and_ingest(results: list[dict | None], qdrant: QdrantStorage, db: SupabaseManager) -> dict:
-    all_ids = []
-    all_vectors = []
-    all_payloads = []
+async def aggregate_and_ingest(results: List[Dict | None], qdrant: QdrantStorage, db: SupabaseManager):
+    """
+    Aggregates the processed document results and ingests new or updated chunks into Qdrant.
+    Args:
+        results (List[Dict | None]): List of processed document results.
+        qdrant (QdrantStorage): The Qdrant storage instance.
+        db (SupabaseManager): The Supabase manager instance.
+    """
+    all_chunks = []
+    all_metadatas = []
     indicators = []
 
     for res in results:
         if res:
-            all_ids.extend(res["ids"])
-            all_vectors.extend(res["vectors"])
-            all_payloads.extend(res["payloads"])
-            indicators.append((res['doc_id'], res['status'], res['new_hash'], res['n_chunks']))
+            all_chunks.extend(res["chunks"])
+            all_metadatas.extend(res["metadatas"])
+            indicators.append((res['doc_id'], res['action'], res['new_hash'], res['n_chunks']))
 
-    if all_ids:
-        await qdrant.upsert(all_ids, all_vectors, all_payloads)
+    if all_chunks:
+        await qdrant.upsert(all_chunks, all_metadatas)
     else:
         print("There are no new vectors to insert.")
 
@@ -172,9 +202,16 @@ async def aggregate_and_ingest(results: list[dict | None], qdrant: QdrantStorage
 
 @flow(name="Static Databricks Documentation Ingestion")
 async def static_load_flow():
+    """
+    Flow to load and ingest Databricks documentation into the vector store:
+        1. Loads documentation from the sitemap.
+        2. Initializes database and vector store managers.
+        3. Processes each document to check for new or updated content.
+        4. Aggregates and ingests new or updated chunks into Qdrant.
+        5. Updates the Supabase database with ingestion checkpoints.
+    """
     db, qdrant = await get_managers()
     splitter = get_text_splitter()
-    model = get_embedding_model()
     source_id = get_source_id(db, "Databricks Docs")
 
     docs = await load_documentation()
@@ -185,12 +222,10 @@ async def static_load_flow():
         db=unmapped(db),
         qdrant=unmapped(qdrant),
         source_id=unmapped(source_id),
-        text_splitter=unmapped(splitter),
-        embedding_model=unmapped(model)
+        text_splitter=unmapped(splitter)
     )
     
     await aggregate_and_ingest(results, qdrant, db)
-
 
 if __name__ == "__main__":
     asyncio.run(static_load_flow())

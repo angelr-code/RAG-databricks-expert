@@ -1,9 +1,8 @@
 from pydantic import BaseModel, Field
-from typing import List, Optional, Dict
+from typing import List
 
 class QueryRequest(BaseModel):
     query_text: str = Field(default="", description="The user input text")
-    keywords: str | None = Field(default=None, description="Keywords to match in the documentation files or articles titles")
     limit: int = Field(default=5, description="Number of chunks to be retrieved from the Vector DB")
     provider: str = Field(default="openai", description="External API LLM Provider")
     model: str | None = Field(default=None, description="Model to be used")
