@@ -15,17 +15,41 @@ from prefect.cache_policies import NO_CACHE
 from src.db.supabase.supabase_client import SupabaseManager
 from src.db.qdrant.qdrant_client import QdrantStorage
 
-# Method from langchain docs to extract cleaner content 
+from src.utils.logger import setup_logging
+
+logger = setup_logging()
+
+# Modified method from langchain docs to extract cleaner content 
 def remove_nav_and_header_elements(content: BeautifulSoup) -> str:
     # Find all 'nav' and 'header' elements in the BeautifulSoup object
     nav_elements = content.find_all("nav")
     header_elements = content.find_all("header")
+    footer_elements = content.find_all("footer")
 
-    # Remove each 'nav' and 'header' element from the BeautifulSoup object
-    for element in nav_elements + header_elements:
+    # Remove each 'nav', 'header' and 'footer' element from the BeautifulSoup object
+    for element in nav_elements + header_elements + footer_elements:
         element.decompose()
 
-    return str(content.get_text())
+
+    text = content.get_text()
+    
+    # Remove "Skip to main content" anywhere in the text
+    text = text.replace("Skip to main content", "")
+    text = text.replace("On this page", "")
+    
+    # Remove "Last updated on" lines
+    import re
+    text = re.sub(r'Last updated on.*?\d{4}', '', text)
+    
+    # Remove footer text
+    footer_start = text.find("Send us feedback")
+    if footer_start != -1:
+        text = text[:footer_start]
+    
+    # Clean up multiple newlines and extra spaces
+    text = re.sub(r'\n\s*\n+', '\n\n', text)
+    
+    return text.strip()
 
 @task
 def extract_title(document: Document) -> str:
@@ -70,7 +94,7 @@ async def load_documentation() -> List[Document]:
         parsing_function=remove_nav_and_header_elements
     )
     docs = await asyncio.to_thread(loader.load) # Trick with asyncio to run sync code
-    print(f"{len(docs)} documents loaded.")
+    logger.info(f"{len(docs)} documents loaded.")
     return docs
 
 @task
@@ -96,8 +120,50 @@ def get_source_id(db: SupabaseManager, source_name: str) -> str:
     return source['source_id']
 
 @task
-def get_text_splitter(chunk_size = 1000, chunk_overlap = 200):
-    return RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
+def get_text_splitter(chunk_size=1500, chunk_overlap=200):
+    """
+    Returns a text splitter optimized for Databricks technical documentation.
+    
+    Uses hierarchical separators to preserve document structure, code blocks,
+    and technical context. Prioritizes splitting at section headers, code blocks,
+    and semantic boundaries rather than arbitrary character counts.
+    
+    Args:
+        chunk_size: Maximum characters per chunk (default: 1500 for technical docs)
+        chunk_overlap: Characters to overlap between chunks (default: 200 for context preservation)
+    
+    Returns:
+        RecursiveCharacterTextSplitter configured for technical documentation
+    """
+    separators = [
+        "\n## ",           # H2 headers - main sections (highest priority)
+        "\n### ",          # H3 headers - subsections
+        "\n#### ",         # H4 headers - sub-subsections
+        "\n\n",            # Paragraph boundaries
+        "\nPython",        # Python code blocks
+        "\nSQL",           # SQL code blocks
+        "\n```",           # Generic code blocks
+        "\nnote",          # Important notes
+        "\nwarning",       # Warnings
+        "\nPreview",       # Preview features
+        "\n- ",            # Bullet lists
+        "\n* ",            # Alternative bullet lists
+        "\n1. ",           # Numbered lists
+        "\n",              # Single line breaks
+        ". ",              # Sentence endings
+        "; ",              # Semicolons (complex lists)
+        ", ",              # Commas (last resort for lists)
+        " ",               # Word boundaries
+        "",                # Character-level fallback
+    ]
+    
+    return RecursiveCharacterTextSplitter(
+        chunk_size=chunk_size,
+        chunk_overlap=chunk_overlap,
+        separators=separators,
+        length_function=len,
+        is_separator_regex=False,
+    )
 
 @task(retries=2, retry_delay_seconds=5, cache_policy=NO_CACHE)
 async def process_document(document, db: SupabaseManager, qdrant: QdrantStorage, source_id: str, text_splitter: RecursiveCharacterTextSplitter) -> Dict | None:
@@ -119,7 +185,7 @@ async def process_document(document, db: SupabaseManager, qdrant: QdrantStorage,
     content = document.page_content
 
     if not content:
-        print(f"Omitted. empty document: {url}")
+        logger.info(f"Omitted. empty document: {url}")
         return
     
     new_hash = hashlib.sha256(content.encode('utf-8')).hexdigest()
@@ -129,7 +195,7 @@ async def process_document(document, db: SupabaseManager, qdrant: QdrantStorage,
     title = extract_title(document)
 
     if existing_doc is None:
-        print(f"New document: {url}")
+        logger.info(f"New document: {url}")
         doc_id = await asyncio.to_thread(
             db.insert_document,
             source_id=source_id,
@@ -142,7 +208,7 @@ async def process_document(document, db: SupabaseManager, qdrant: QdrantStorage,
             return None
     elif existing_doc['hash'] != new_hash:
         #update
-        print("Updated document")
+        logger.info("Updated document")
         doc_id = existing_doc['id']
 
         await qdrant.delete_by_document_id(doc_id)
@@ -191,7 +257,7 @@ async def aggregate_and_ingest(results: List[Dict | None], qdrant: QdrantStorage
     if all_chunks:
         await qdrant.upsert(all_chunks, all_metadatas)
     else:
-        print("There are no new vectors to insert.")
+        logger.info("There are no new vectors to insert.")
 
     for doc_id, action, new_hash, n_chunks in indicators:
         if action == 'new':
@@ -216,7 +282,7 @@ async def static_load_flow():
 
     docs = await load_documentation()
 
-    print("Mapping documents processing")
+    logger.info("Mapping documents processing")
     results = process_document.map(
         document=docs,
         db=unmapped(db),
