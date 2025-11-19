@@ -136,6 +136,11 @@ class QdrantStorage():
         query_dense = list(self.dense_model.embed([query_text]))[0]
         query_sparse = list(self.sparse_model.embed([query_text]))[0]
 
+        qdrant_sparse_vector = SparseVector(    
+            indices=query_sparse.indices,
+            values=query_sparse.values
+        )
+
         # We perform hybrid search for the result to have both conceptual meaning and the adequate technical terms
         results = await self.client.query_points(
             collection_name=self.collection,
@@ -146,7 +151,7 @@ class QdrantStorage():
                     limit=top_k * 2
                 ),
                 Prefetch(
-                    query=query_sparse,
+                    query=qdrant_sparse_vector,
                     using="sparse_vector",
                     limit=top_k * 2
                 )
