@@ -1,10 +1,14 @@
 import opik
 
+import json
+
+from collections.abc import AsyncGenerator
+
 from src.backend_api.models.api_models import SearchResult, QueryRequest, QueryResponse
 from src.backend_api.models.provider_models import ModelConfig
 from src.utils.logger import setup_logging
 from src.backend_api.core.utils.openai_provider import generate_openai, stream_openai
-from src.backend_api.core.utils.openrouter_provider import generate_openrouter
+from src.backend_api.core.utils.openrouter_provider import generate_openrouter, stream_openrouter
 
 logger = setup_logging()
 
@@ -34,6 +38,16 @@ which are retrieved from a vector database, without relying on outside knowledge
 """
 
 def build_prompt(query_text: str, contexts: SearchResult, max_tokens: int) -> str:
+    """
+    Build the prompt for the LLM using the query text and retrieved contexts.
+    Args:
+        query_text (str): The user's query text.
+        contexts (SearchResult): The retrieved contexts from the vector database.
+        max_tokens (int): The maximum number of tokens for the response.
+        
+    Returns:
+        str: The formatted prompt string.
+    """
     contexts_list = [
         f"- URL: {source}\n Content: {context}" for source, context in zip(contexts.sources, contexts.contexts)
     ]
@@ -47,6 +61,17 @@ def build_prompt(query_text: str, contexts: SearchResult, max_tokens: int) -> st
 
 @opik.track(name="generate_answer")
 async def generate_answer(query_request: QueryRequest, search_result: SearchResult, user_api_key: str | None = None) -> QueryResponse:
+    """
+    Generate an answer based on the query request and search results.
+    
+    Args:
+        query_request (QueryRequest): The user's query request.
+        search_result (SearchResult): The search results from the vector database.
+        user_api_key (str | None): The user's API key for the LLM provider.
+    
+    Returns:
+        QueryResponse: The generated response including the answer and metadata.
+    """
 
     selected_model = query_request.model or "gpt-4o-mini"
     config = ModelConfig(requested_model=selected_model)
@@ -71,3 +96,40 @@ async def generate_answer(query_request: QueryRequest, search_result: SearchResu
     )
 
     return response
+
+async def generate_streaming_answer(query_request: QueryRequest, search_result: SearchResult, user_api_key: str | None = None) -> AsyncGenerator[str,None]:
+    """
+    Generate a streaming answer based on the query request and search results.
+    
+    Args:
+        query_request (QueryRequest): The user's query request.
+        search_result (SearchResult): The search results from the vector database.
+        user_api_key (str | None): The user's API key for the LLM provider.
+    
+    Yields:
+        AsyncGenerator[str, None]: An asynchronous generator yielding response chunks.
+    """
+    selected_model = query_request.model or "gpt-4o-mini"
+    config = ModelConfig(requested_model=selected_model)
+
+    prompt = build_prompt(query_request.query_text, search_result, config.max_completion_tokens)
+
+    sources_data = json.dumps({
+        "type": "sources", 
+        "data": list(search_result.sources)
+    })
+    yield f"{sources_data}\n"
+
+    generator = None
+    if query_request.provider == "openai":
+        logger.info("OpenAI provider selected for generation...")
+        generator = stream_openai(prompt, config, user_api_key)
+    elif query_request.provider == "OpenRouter":
+        logger.info("OpenRouter provider selected for generation...")
+        generator = stream_openrouter(prompt, config)   
+    else:
+        logger.warning(f"Unsupported provider: {query_request.provider}. Selecting ")
+        return 
+    
+    async for chunk in generator:
+        yield chunk

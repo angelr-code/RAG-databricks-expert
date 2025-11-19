@@ -4,7 +4,6 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from src.db.qdrant.qdrant_client import QdrantStorage
-from langchain_huggingface import HuggingFaceEmbeddings
 
 from src.backend_api.routes.query_routes import router as query_router
 from src.backend_api.routes.health_routes import router as health_router
@@ -20,14 +19,6 @@ async def lifespan(app: FastAPI):
     # Initialize vector storage
     app.state.vectorstore = QdrantStorage()
     await app.state.vectorstore.initialize()
-
-    # Initialize embedding model
-    app.state.embedding_model = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
-
-    # Load OpenRouter API key from environment variable
-    # app.state.openrouter_api_key = os.getenv("OPENROUTER_API_KEY", None)
-    # if app.state.openrouter_api_key is None:
-    #     logger.warning("OPENROUTER_API_KEY environment variable is not set. Make sure to provide it for OpenRouter access.")
 
     yield
 
@@ -45,10 +36,7 @@ app = FastAPI(
 app.include_router(query_router, prefix="/query", tags=["query"])
 app.include_router(health_router, tags=["health"])
 
-# Middleware and exception handlers ??? (what this does??)
-
-# Routers and other stuff with the API endpoints
-
+# Middleware and exception handlers ???
 
 if __name__ == '__main__':
     import uvicorn
@@ -58,6 +46,6 @@ if __name__ == '__main__':
         host="0.0.0.0",
         port=port,
         log_level="info",
-        reload=True,  # Enable auto-reload for development
+        reload=True  # auto-reload for development
     )
 
