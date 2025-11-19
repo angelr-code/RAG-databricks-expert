@@ -1,5 +1,7 @@
 from collections.abc import AsyncGenerator
 
+from typing import Tuple
+
 from openai import AsyncOpenAI, AuthenticationError, OpenAIError
 from openai.types.chat import ChatCompletionSystemMessageParam
 from opik.integrations.openai import track_openai
@@ -9,7 +11,7 @@ from src.utils.logger import setup_logging
 
 logger = setup_logging()
 
-async def generate_openai(prompt: str, config: ModelConfig, api_key: str | None) -> str: 
+async def generate_openai(prompt: str, config: ModelConfig, api_key: str | None) -> Tuple[str, str]: 
     """
     Generate a response from OpenAI for a given prompt and model configuration.
 
@@ -19,7 +21,7 @@ async def generate_openai(prompt: str, config: ModelConfig, api_key: str | None)
         api_key (str | None): The user's API key for OpenAI.
         
     Returns:
-        str: The generated response text.
+        Tuple[str, str]: The generated response text and the model used.
     """
     try:
         openai_client = AsyncOpenAI(api_key=api_key)

@@ -4,6 +4,7 @@ from src.backend_api.models.api_models import SearchResult, QueryRequest, QueryR
 from src.backend_api.models.provider_models import ModelConfig
 from src.utils.logger import setup_logging
 from src.backend_api.core.utils.openai_provider import generate_openai, stream_openai
+from src.backend_api.core.utils.openrouter_provider import generate_openrouter
 
 logger = setup_logging()
 
@@ -57,9 +58,9 @@ async def generate_answer(query_request: QueryRequest, search_result: SearchResu
         answer_text, model_used = await generate_openai(prompt, config, user_api_key)
     elif query_request.provider == "OpenRouter":
         logger.info("OpenRouter provider selected for generation...")
-        # Here I would implement the OpenRouter generation logic
+        answer_text, model_used = await generate_openrouter(prompt, config)     
     else:
-        raise ValueError(f"Unsupported provider: {query_request.provider}")
+        logger.warning(f"Unsupported provider: {query_request.provider}. Selecting ")
 
     response = QueryResponse(
         query_text=query_request.query_text,
