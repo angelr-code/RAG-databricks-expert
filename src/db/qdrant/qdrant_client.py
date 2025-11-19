@@ -16,6 +16,7 @@ from qdrant_client.models import (
     MatchValue,
     KeywordIndexParams,
     KeywordIndexType,
+    SparseVector,
     SparseVectorParams,
     SparseIndexParams,
     Prefetch,
@@ -40,7 +41,7 @@ class QdrantStorage():
         self.collection = collection
         self.dim = dim
         self.dense_model = TextEmbedding(model_name="BAAI/bge-small-en-v1.5")
-        self.sparse_model = SparseTextEmbedding(model_name="prithivida/Splade_PP_en_v1")
+        self.sparse_model = SparseTextEmbedding(model_name="Qdrant/bm25")
 
     async def initialize(self):
         """
@@ -100,8 +101,11 @@ class QdrantStorage():
             
             points = [PointStruct(id = str(uuid.uuid4()), 
                                   vector = {
-                                      "dense_vector": list(dense_vectors[i]),
-                                      "sparse_vector": sparse_vectors[i]
+                                      "dense_vector": dense_vectors[i].tolist(),
+                                      "sparse_vector": SparseVector(
+                                          indices=sparse_vectors[i].indices.tolist(),
+                                          values=sparse_vectors[i].values.tolist()
+                                      )
                                   }, 
                                   payload = {
                                       "text": chunks[i],
