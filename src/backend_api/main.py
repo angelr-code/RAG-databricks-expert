@@ -1,7 +1,8 @@
 import os 
+from time import time
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 
 from src.db.qdrant.qdrant_client import QdrantStorage
 
@@ -33,19 +34,43 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+# Middleware 
+@app.middleware("http")
+async def add_process_time_header(request: Request, call_next):
+    """
+    Middleware to log request processing time and details.
+    
+    Args:
+        request (Request): The incoming HTTP request.
+        call_next: The next middleware or route handler to call.
+    
+    Returns:
+        Response: The HTTP response after processing.
+    """
+    start = time()
+    response = await call_next(request)
+    process_time = time.time() - start
+
+    response.headers["X-Process-Time"] = str(process_time)
+
+    if request.url.path != '/health':
+        logger.info(f"Path: {request.url.path} | Method: {request.method} | Status: {response.status_code} | Time: {process_time:.4f}s")
+
+    return response
+
+
 app.include_router(query_router, prefix="/query", tags=["query"])
 app.include_router(health_router, tags=["health"])
 
-# Middleware and exception handlers ???
 
 if __name__ == '__main__':
     import uvicorn
     port = int(os.getenv("PORT", 8000))
     uvicorn.run(
-        "src.backend_api.main:app",
+        app,
         host="0.0.0.0",
         port=port,
         log_level="info",
-        reload=True  # auto-reload for development
+        reload=True  # auto-reload for DEV. Change to False in PRODUCTION.
     )
 
