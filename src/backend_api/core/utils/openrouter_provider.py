@@ -65,7 +65,7 @@ def stream_openrouter(prompt: str, config: ModelConfig) -> AsyncGenerator[str, N
         AsyncGenerator[str, None]: An asynchronous generator yielding response chunks.
     """
     api_key = os.getenv("OPENROUTER_API_KEY")
-    client = AsyncOpenAI(api_key=api_key)
+    client = AsyncOpenAI(base_url="https://openrouter.ai/api/v1",api_key=api_key)
     tracked_client = track_openai(client)
 
     async def gen() -> AsyncGenerator[str, None]:
