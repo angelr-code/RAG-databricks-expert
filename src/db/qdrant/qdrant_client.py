@@ -30,7 +30,7 @@ from src.backend_api.models.api_models import SearchResult
 
 logger = setup_logging()
 
-QDRANT_URL = os.getenv("QDRANT_URL", "http://localhost:6333")
+QDRANT_URL = os.getenv("QDRANT_URL")
 QDRANT_COLLECTION = os.getenv("QDRANT_COLLECTION", "docs")
 EMBEDDING_DIM = int(os.getenv("EMBEDDING_DIM", 384))
 

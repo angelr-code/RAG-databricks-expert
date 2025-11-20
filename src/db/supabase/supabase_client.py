@@ -2,8 +2,8 @@ import os
 from supabase import create_client
 from datetime import datetime
 
-SUPABASE_URL = os.getenv("SUPABASE_URL", "http://127.0.0.1:54321")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY", "sb_secret_N7UND0UgjKTVK-Uodkm0Hg_xSvEMPvz")
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
 from src.utils.logger import setup_logging
 
