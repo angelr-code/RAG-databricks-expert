@@ -1,5 +1,3 @@
-import opik
-
 import json
 
 from collections.abc import AsyncGenerator
@@ -102,7 +100,7 @@ def build_prompt(query_text: str, contexts: SearchResult, max_tokens: int) -> st
         tokens=max_tokens
     )
 
-@opik.track(name="generate_answer")
+
 async def generate_answer(query_request: QueryRequest, search_result: SearchResult, user_api_key: str | None = None) -> QueryResponse:
     """
     Generate an answer based on the query request and search results.

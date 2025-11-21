@@ -1,5 +1,3 @@
-import opik
-
 from src.backend_api.models.api_models import SearchResult
 from src.db.qdrant.qdrant_client import QdrantStorage
 
@@ -7,7 +5,6 @@ from src.utils.logger import setup_logging
 
 logger = setup_logging()
 
-@opik.track(name="rag_retrieval")
 async def search_service(query_text: str, vectorstore: QdrantStorage, limit: int = 5) -> SearchResult:
     """
     Performs a search in the Vector DB based on the query_text and optional keywords.

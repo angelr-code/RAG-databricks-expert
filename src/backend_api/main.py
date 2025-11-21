@@ -11,10 +11,13 @@ from src.backend_api.routes.health_routes import router as health_router
 
 from src.utils.logger import setup_logging
 
+from dotenv import load_dotenv
+
 logger = setup_logging()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    load_dotenv()
     logger.info("Starting up the FastAPI application (OpenAI MVP Mode)...")
 
     # Initialize vector storage
@@ -49,7 +52,7 @@ async def add_process_time_header(request: Request, call_next):
     """
     start = time()
     response = await call_next(request)
-    process_time = time.time() - start
+    process_time = time() - start
 
     response.headers["X-Process-Time"] = str(process_time)
 
@@ -67,10 +70,9 @@ if __name__ == '__main__':
     import uvicorn
     port = int(os.getenv("PORT", 8000))
     uvicorn.run(
-        app,
+        "src.backend_api.main:app",
         host="0.0.0.0",
         port=port,
         log_level="info",
         reload=True  # auto-reload for DEV. Change to False in PRODUCTION.
     )
-

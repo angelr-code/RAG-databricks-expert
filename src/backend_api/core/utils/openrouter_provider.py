@@ -2,7 +2,6 @@ import os
 
 from openai import AsyncOpenAI, AuthenticationError, OpenAIError
 from openai.types.chat import ChatCompletionSystemMessageParam
-from opik.integrations.openai import track_openai
 
 from collections.abc import AsyncGenerator
 
@@ -30,11 +29,10 @@ async def generate_openrouter(prompt: str, config: ModelConfig) -> Tuple[str, st
         raise ValueError("Configuration error: OpenRouter API Key missing.")
     try:
         client = AsyncOpenAI(base_url="https://openrouter.ai/api/v1", api_key=api_key)
-        tracked_client = track_openai(client)
 
         logger.info(f"Calling OpenRouter with model: {config.requested_model}")
 
-        response = await tracked_client.chat.completions.create(
+        response = await client.chat.completions.create(
             model=config.requested_model,
             messages=[
                 ChatCompletionSystemMessageParam(role="user",content=prompt)
@@ -66,10 +64,9 @@ def stream_openrouter(prompt: str, config: ModelConfig) -> AsyncGenerator[str, N
     """
     api_key = os.getenv("OPENROUTER_API_KEY")
     client = AsyncOpenAI(base_url="https://openrouter.ai/api/v1",api_key=api_key)
-    tracked_client = track_openai(client)
 
     async def gen() -> AsyncGenerator[str, None]:
-        stream = await tracked_client.chat.completions.create(
+        stream = await client.chat.completions.create(
             model=config.requested_model,
             messages=[
                 ChatCompletionSystemMessageParam(role="user",content=prompt)

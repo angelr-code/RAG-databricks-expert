@@ -7,7 +7,7 @@ class QueryRequest(BaseModel):
     provider: str = Field(default="openai", description="External API LLM Provider")
     model: str | None = Field(default=None, description="Model to be used")
 
-class QueryResponse(BaseModel): # need to check 
+class QueryResponse(BaseModel): 
     query_text: str = Field(default="", description="The original input text")
     provider: str = Field(default="OpenRouter", description="External API LLM Provider used")
     model: str | None = Field(default=None, description="Model used")

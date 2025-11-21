@@ -4,7 +4,6 @@ from typing import Tuple
 
 from openai import AsyncOpenAI, AuthenticationError, OpenAIError
 from openai.types.chat import ChatCompletionSystemMessageParam
-from opik.integrations.openai import track_openai
 
 from src.backend_api.models.provider_models import ModelConfig
 from src.utils.logger import setup_logging
@@ -25,9 +24,8 @@ async def generate_openai(prompt: str, config: ModelConfig, api_key: str | None)
     """
     try:
         openai_client = AsyncOpenAI(api_key=api_key)
-        tracked_openai_client = track_openai(openai_client)
 
-        response = await tracked_openai_client.chat.completions.create(
+        response = await openai_client.chat.completions.create(
             model=config.requested_model,
             messages=[
                 ChatCompletionSystemMessageParam(role="user",content=prompt)
@@ -58,10 +56,9 @@ def stream_openai(prompt: str, config: ModelConfig, api_key: str | None = None) 
         AsyncGenerator[str, None]: An asynchronous generator yielding response chunks.
     """
     openai_client = AsyncOpenAI(api_key=api_key)
-    tracked_openai_client = track_openai(openai_client)
 
     async def gen() -> AsyncGenerator[str, None]:
-        stream = await tracked_openai_client.chat.completions.create(
+        stream = await openai_client.chat.completions.create(
             model=config.requested_model,
             messages=[
                 ChatCompletionSystemMessageParam(role="user",content=prompt)
