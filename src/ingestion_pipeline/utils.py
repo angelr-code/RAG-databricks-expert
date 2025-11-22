@@ -1,16 +1,14 @@
 import os
 import asyncio
 import hashlib
+from typing import List, Optional, Dict
 
-from typing import Dict, List
+from prefect import task
+from prefect.cache_policies import NO_CACHE
 
 from bs4 import BeautifulSoup
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_community.document_loaders import SitemapLoader
 from langchain_core.documents import Document
-
-from prefect import flow, task, unmapped
-from prefect.cache_policies import NO_CACHE
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from src.db.supabase.supabase_client import SupabaseManager
 from src.db.qdrant.qdrant_client import QdrantStorage
@@ -51,6 +49,103 @@ def remove_nav_and_header_elements(content: BeautifulSoup) -> str:
     
     return text.strip()
 
+def html_to_clean_text(html: str) -> str:
+    if not html:
+        return ""
+    soup = BeautifulSoup(html, "html.parser")
+
+    # Recomve headers/navs/footers
+    for tag in soup.select("nav, header, footer"):
+        tag.decompose()
+
+    # Expand links as text (text + " (link)")
+    for a in soup.find_all("a"):
+        if a.string:
+            a.replace_with(f"{a.string} ({a.get('href','')})")
+
+    text = soup.get_text(separator="\n").strip()
+
+    # Collapse extra blank lines
+    import re
+    text = re.sub(r'\n\s*\n+', '\n\n', text)
+
+    return text.strip()
+
+@task
+async def get_managers() -> tuple[SupabaseManager, QdrantStorage]:
+    """Initializes and returns the Supabase and Qdrant managers."""
+    vectorstore = QdrantStorage()
+    await vectorstore.initialize()
+    return SupabaseManager(), vectorstore
+
+@task
+def get_text_splitter(chunk_size=1500, chunk_overlap=200):
+    """
+    Returns a text splitter optimized for Databricks technical documentation.
+    
+    Uses hierarchical separators to preserve document structure, code blocks,
+    and technical context. Prioritizes splitting at section headers, code blocks,
+    and semantic boundaries rather than arbitrary character counts.
+    
+    Args:
+        chunk_size: Maximum characters per chunk (default: 1500 for technical docs)
+        chunk_overlap: Characters to overlap between chunks (default: 200 for context preservation)
+    
+    Returns:
+        RecursiveCharacterTextSplitter configured for technical documentation
+    """
+    separators = [
+        "\n# ",            # H1
+        "\n## ",           # H2
+        "\n### ",          # H3
+        "\n#### ",         # H4
+        "\n\n",            # Paragraphs
+        
+        # Code blocks
+        "```",             # Full code fences
+        "\n```",           
+        
+        # Tables
+        "\n|",             # Start of a markdown table row
+
+        # Lists
+        "\n- ",            # Bullet lists
+        "\n* ",            # Bullet lists (alt)
+        "\n1. ",           # Numbered lists
+
+        # Fallbacks
+        "\n",              # Line breaks
+        ". ",              # Sentences
+        "; ",              # Semicolon lists
+        ", ",              # Commas
+        " ",               # Words
+        "",                # Character fallback
+    ]
+
+    
+    return RecursiveCharacterTextSplitter(
+        chunk_size=chunk_size,
+        chunk_overlap=chunk_overlap,
+        separators=separators,
+        length_function=len,
+        is_separator_regex=False,
+    )
+
+@task(cache_policy=NO_CACHE)
+def get_source_id(db: SupabaseManager, source_name: str) -> str:
+    """Obtains the UUID from the sources 'Databricks Docs' or 'Release Notes'.
+    
+    Args:
+        db (SupabaseManager): The Supabase manager instance.
+        source_name (str): The name of the source to look for.
+    Returns:
+        str: The UUID of the source.
+    """
+    source = db.get_source_by_name(source_name) 
+    if not source:
+        raise ValueError(f"Source '{source_name}' not found in the DB.")
+    return source['source_id']
+
 @task
 def extract_title(document: Document) -> str:
     """
@@ -82,91 +177,11 @@ def extract_title(document: Document) -> str:
     # Using the URL
     url = document.metadata.get('source', '')
     url_title = os.path.basename(url.rstrip('/'))
-    return url_title.replace('-', ' ').title()     
-    
+    return url_title.replace('-', ' ').title()
 
-@task
-async def load_documentation() -> List[Document]:
-    """Loads all the documentation once"""
-    loader = SitemapLoader(
-        "https://docs.databricks.com/en/doc-sitemap.xml",
-        filter_urls=["https://docs.databricks.com/aws/en/delta-sharing"],
-        parsing_function=remove_nav_and_header_elements
-    )
-    docs = await asyncio.to_thread(loader.load) # Trick with asyncio to run sync code
-    logger.info(f"{len(docs)} documents loaded.")
-    return docs
-
-@task
-async def get_managers() -> tuple[SupabaseManager, QdrantStorage]:
-    """Initializes and returns the Supabase and Qdrant managers."""
-    vectorstore = QdrantStorage()
-    await vectorstore.initialize()
-    return SupabaseManager(), vectorstore
-
-@task(cache_policy=NO_CACHE)
-def get_source_id(db: SupabaseManager, source_name: str) -> str:
-    """Obtains the UUID from the source 'Databricks Docs'.
-    
-    Args:
-        db (SupabaseManager): The Supabase manager instance.
-        source_name (str): The name of the source to look for.
-    Returns:
-        str: The UUID of the source.
-    """
-    source = db.get_source_by_name(source_name) 
-    if not source:
-        raise ValueError(f"Source '{source_name}' not found in the DB.")
-    return source['source_id']
-
-@task
-def get_text_splitter(chunk_size=1500, chunk_overlap=200):
-    """
-    Returns a text splitter optimized for Databricks technical documentation.
-    
-    Uses hierarchical separators to preserve document structure, code blocks,
-    and technical context. Prioritizes splitting at section headers, code blocks,
-    and semantic boundaries rather than arbitrary character counts.
-    
-    Args:
-        chunk_size: Maximum characters per chunk (default: 1500 for technical docs)
-        chunk_overlap: Characters to overlap between chunks (default: 200 for context preservation)
-    
-    Returns:
-        RecursiveCharacterTextSplitter configured for technical documentation
-    """
-    separators = [
-        "\n## ",           # H2 headers - main sections (highest priority)
-        "\n### ",          # H3 headers - subsections
-        "\n#### ",         # H4 headers - sub-subsections
-        "\n\n",            # Paragraph boundaries
-        "\nPython",        # Python code blocks
-        "\nSQL",           # SQL code blocks
-        "\n```",           # Generic code blocks
-        "\nnote",          # Important notes
-        "\nwarning",       # Warnings
-        "\nPreview",       # Preview features
-        "\n- ",            # Bullet lists
-        "\n* ",            # Alternative bullet lists
-        "\n1. ",           # Numbered lists
-        "\n",              # Single line breaks
-        ". ",              # Sentence endings
-        "; ",              # Semicolons (complex lists)
-        ", ",              # Commas (last resort for lists)
-        " ",               # Word boundaries
-        "",                # Character-level fallback
-    ]
-    
-    return RecursiveCharacterTextSplitter(
-        chunk_size=chunk_size,
-        chunk_overlap=chunk_overlap,
-        separators=separators,
-        length_function=len,
-        is_separator_regex=False,
-    )
 
 @task(retries=2, retry_delay_seconds=5, cache_policy=NO_CACHE)
-async def process_document(document, db: SupabaseManager, qdrant: QdrantStorage, source_id: str, text_splitter: RecursiveCharacterTextSplitter) -> Dict | None:
+async def process_document(document: Document, db: SupabaseManager, qdrant: QdrantStorage, source_id: str, text_splitter: RecursiveCharacterTextSplitter, doc_type: str) -> Optional[Dict]:
     """
     Processes a single document: checks for new or updated content, splits into chunks, and prepares metadata.
 
@@ -176,23 +191,24 @@ async def process_document(document, db: SupabaseManager, qdrant: QdrantStorage,
         qdrant (QdrantStorage): The Qdrant storage instance.
         source_id (str): The source ID associated with the document.
         text_splitter (RecursiveCharacterTextSplitter): The text splitter instance.
+        type (str): 'Documentation' or 'Release Notes'
     
     Returns:
         dict | None: A dictionary containing document ID, chunks, metadatas, action type, new hash, and number of chunks,
                       or None if the document is unchanged.
     """
-    url = document.metadata.get('source')
-    content = document.page_content
+    url = document.metadata.get("source") or ""
+    content = document.page_content or ""
 
     if not content:
         logger.info(f"Omitted. empty document: {url}")
         return
     
+    title = document.metadata.get("title") if doc_type == 'Release Notes' else extract_title(document)
+
     new_hash = hashlib.sha256(content.encode('utf-8')).hexdigest()
 
     existing_doc = await asyncio.to_thread(db.get_document_by_url, url)
-
-    title = extract_title(document)
 
     if existing_doc is None:
         logger.info(f"New document: {url}")
@@ -263,35 +279,4 @@ async def aggregate_and_ingest(results: List[Dict | None], qdrant: QdrantStorage
         if action == 'new':
             db.ingestion_checkpoint(doc_id, n_chunks)
         elif action == 'update':
-            db.update_document_hash(doc_id, new_hash, n_chunks)   
-
-
-@flow(name="Static Databricks Documentation Ingestion")
-async def static_load_flow():
-    """
-    Flow to load and ingest Databricks documentation into the vector store:
-        1. Loads documentation from the sitemap.
-        2. Initializes database and vector store managers.
-        3. Processes each document to check for new or updated content.
-        4. Aggregates and ingests new or updated chunks into Qdrant.
-        5. Updates the Supabase database with ingestion checkpoints.
-    """
-    db, qdrant = await get_managers()
-    splitter = get_text_splitter()
-    source_id = get_source_id(db, "Databricks Docs")
-
-    docs = await load_documentation()
-
-    logger.info("Mapping documents processing")
-    results = process_document.map(
-        document=docs,
-        db=unmapped(db),
-        qdrant=unmapped(qdrant),
-        source_id=unmapped(source_id),
-        text_splitter=unmapped(splitter)
-    )
-    
-    await aggregate_and_ingest(results, qdrant, db)
-
-if __name__ == "__main__":
-    asyncio.run(static_load_flow())
+            db.update_document_hash(doc_id, new_hash, n_chunks)
