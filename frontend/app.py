@@ -43,9 +43,9 @@ class ModelInfo:
     description: str
 
 OPENROUTER_MODELS = [
-    ModelInfo("x-ai/grok-4.1-fast:free", "Grok-4.1-fast", "𝕏", "Ultra fast and efficient"),
-    ModelInfo("nvidia/nemotron-nano-12b-v2-vl:free", "Nvidia Nemotron 12B", "🟢", "Vision specialized"),
-    ModelInfo("meta-llama/llama-3.3-70b-instruct:free", "Llama 3.3 70B Instruct", "🦙", "High-quality reasoning")
+    ModelInfo("tngtech/deepseek-r1t2-chimera:free", "Deepseek-r1t2-chimera", "🐳", "Massive 671B reasoning & coding engine. It has the highest latency"),
+    ModelInfo("meta-llama/llama-3.3-70b-instruct:free", "Llama 3.3 70B Instruct", "🦙", "High-quality reasoning and fast"),
+    ModelInfo("nvidia/nemotron-nano-12b-v2-vl:free", "Nvidia Nemotron 12B", "🟢", "Light, Ultra fast and efficient")
 ]
 
 OPENAI_MODELS = [
