@@ -43,7 +43,7 @@ class ModelInfo:
     description: str
 
 OPENROUTER_MODELS = [
-    ModelInfo("deepseek/deepseek-r1-0528-qwen3-8b:free", "DeepSeek-R1-0528-Qwen3-8B", "🐳", "Ultra fast and efficient"),
+    ModelInfo("x-ai/grok-4.1-fast:free", "Grok-4.1-fast", "𝕏", "Ultra fast and efficient"),
     ModelInfo("nvidia/nemotron-nano-12b-v2-vl:free", "Nvidia Nemotron 12B", "🟢", "Vision specialized"),
     ModelInfo("meta-llama/llama-3.3-70b-instruct:free", "Llama 3.3 70B Instruct", "🦙", "High-quality reasoning")
 ]
@@ -161,15 +161,15 @@ def inject_custom_css():
         }}
 
         /* ============================================================ */
-        /* CORRECCIÓN TOTAL DE TIPOGRAFÍA DENTRO DEL CHAT */
+        /* TOTAL TYPOGRAPHY CORRECTION WITHIN CHAT */
         /* ============================================================ */
         
-        /* Reset completo de estilos de texto en mensajes del chat */
+        /* Full reset of text styles in chat messages */
         [data-testid="stChatMessage"] * {{
             font-weight: normal !important;
         }}
         
-        /* Encabezados H1 */
+        /* H1 Headers */
         [data-testid="stChatMessage"] h1 {{
             font-size: 1.4rem !important;
             font-weight: 600 !important;
@@ -179,7 +179,7 @@ def inject_custom_css():
             color: {COLORS['text']} !important;
         }}
         
-        /* Encabezados H2 */
+        /* H2 Headers */
         [data-testid="stChatMessage"] h2 {{
             font-size: 1.25rem !important;
             font-weight: 600 !important;
@@ -187,7 +187,7 @@ def inject_custom_css():
             color: {COLORS['primary']} !important;
         }}
         
-        /* Encabezados H3 */
+        /* H3 Headers */
         [data-testid="stChatMessage"] h3 {{
             font-size: 1.1rem !important;
             font-weight: 600 !important;
@@ -195,7 +195,7 @@ def inject_custom_css():
             color: {COLORS['text']} !important;
         }}
         
-        /* Párrafos - TAMAÑO NORMAL Y SIN NEGRITA */
+        /* Paragraphs - NORMAL SIZE AND NO BOLD */
         [data-testid="stChatMessage"] p {{
             font-size: 0.95rem !important;
             line-height: 1.6 !important;
@@ -204,14 +204,14 @@ def inject_custom_css():
             color: {COLORS['text']} !important;
         }}
         
-        /* Texto dentro de divs */
+        /* Text inside divs */
         [data-testid="stChatMessage"] div {{
             font-size: 0.95rem !important;
             font-weight: 400 !important;
             color: {COLORS['text']} !important;
         }}
         
-        /* Listas */
+        /* Lists */
         [data-testid="stChatMessage"] ul,
         [data-testid="stChatMessage"] ol {{
             margin: 0.8rem 0;
@@ -227,13 +227,13 @@ def inject_custom_css():
             color: {COLORS['text']} !important;
         }}
         
-        /* Strong/Bold - Con peso moderado */
+        /* Strong/Bold - With moderate weight */
         [data-testid="stChatMessage"] strong {{
             color: {COLORS['primary']} !important;
             font-weight: 600 !important;
         }}
         
-        /* Código inline */
+        /* Inline code */
         [data-testid="stChatMessage"] code {{
             background-color: {COLORS['sidebar']};
             padding: 0.2rem 0.4rem;
@@ -244,7 +244,7 @@ def inject_custom_css():
             color: #00CC88 !important;
         }}
         
-        /* Bloques de código */
+        /* Code blocks */
         [data-testid="stChatMessage"] pre {{
             background-color: {COLORS['sidebar']};
             padding: 1rem;
@@ -606,8 +606,8 @@ def render_sidebar() -> Dict:
             "api_key": None,
             "model_id": "",
             "provider": "",
-            "limit": 5,
-            "streaming": True
+            "limit": 10,
+            "use_context": False
         }
         
         # Configuration based on provider
@@ -660,16 +660,19 @@ def render_sidebar() -> Dict:
         # Additional Configuration
         st.subheader("Parameters")
         
+        # Updated slider: Max 20, default 10
         config["limit"] = st.slider(
             "Sources to retrieve",
             min_value=1,
-            max_value=10,
+            max_value=20, 
             value=5
         )
         
-        config["streaming"] = st.toggle(
-            "Typing effect (Stream)",
-            value=True
+        # Context Window toggle
+        config["use_context"] = st.toggle(
+            "Enable Context Window",
+            value=True,
+            help="If enabled, this will smartly use previous messages to improve search accuracy for follow-up questions."
         )
         
         st.markdown("---")
@@ -722,35 +725,65 @@ def main():
         
         # Generate response
         with st.chat_message("assistant", avatar="🤖"):
-            if config["streaming"]:
-                response_placeholder = st.empty()
+            response_placeholder = st.empty()
+            
+            # --- START OF FULL CONTEXT LOGIC (USER + ASSISTANT) ---
+            query_to_send = prompt
+            
+            # Check if we have enough history: 
+            # We need at least 3 messages in state: [User_1, AI_1, User_2(Current)]
+            if config["use_context"] and len(st.session_state.messages) >= 3:
                 
-                with st.spinner("Searching documentation..."):
-                    full_response, sources, error = stream_api_response(
-                        query=prompt,
-                        provider=config["provider"],
-                        model_id=config["model_id"],
-                        limit=config["limit"],
-                        placeholder=response_placeholder,
-                        api_key=config["api_key"]
-                    )
+                # Retrieve the actual last interaction
+                # messages[-1] is the current prompt (we just appended it)
+                # messages[-2] is the last Assistant response
+                # messages[-3] is the last User prompt
                 
-                if error:
-                    st.error(error)
-                    st.stop()
+                last_assistant_msg = st.session_state.messages[-2]["content"]
+                last_user_msg = st.session_state.messages[-3]["content"]
                 
-                render_sources(sources)
+                # Heuristics: Should we attach context?
+                # Condition A: Short prompt
+                is_short = len(prompt.split()) < 8
                 
-                st.session_state.messages.append({
-                    "role": "assistant",
-                    "content": full_response,
-                    "sources": sources
-                })
-                st.rerun()
+                # Condition B: Reference words
+                ref_words = ['it', 'that', 'this', 'code', 'example', 'previous', 'last', 'one', 'explain', 'mean', 'why']
+                has_reference = any(word in prompt.lower() for word in ref_words)
                 
-            else:
-                # Fallback if user disables streaming
-                st.warning("Non-streaming mode not implemented in this snippet")
+                if is_short or has_reference:
+                    # We combine everything so the LLM sees exactly what happened
+                    query_to_send = f"""
+                    PREVIOUS INTERACTION:
+                    User: {last_user_msg}
+                    Assistant: {last_assistant_msg}
+                    
+                    CURRENT QUESTION:
+                    {prompt}
+                    """
+            # --- END OF LOGIC ---
+
+            with st.spinner("Searching documentation..."):
+                full_response, sources, error = stream_api_response(
+                    query=query_to_send, 
+                    provider=config["provider"],
+                    model_id=config["model_id"],
+                    limit=config["limit"],
+                    placeholder=response_placeholder,
+                    api_key=config["api_key"]
+                )
+            
+            if error:
+                st.error(error)
+                st.stop()
+            
+            render_sources(sources)
+            
+            st.session_state.messages.append({
+                "role": "assistant",
+                "content": full_response,
+                "sources": sources
+            })
+            st.rerun()
 
 if __name__ == "__main__":
     main()
