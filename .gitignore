@@ -210,3 +210,9 @@ __marimo__/
 data/
 volumes/
 .sql_schemas
+
+# --- Terraform ---
+.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfvars
