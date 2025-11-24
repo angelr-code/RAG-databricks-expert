@@ -1,0 +1,25 @@
+FROM public.ecr.aws/lambda/python:3.10
+
+# Copy the requirements file to the Lambda task root directory and install the dependencies.
+COPY src/backend_api/requirements.txt ${LAMBDA_TASK_ROOT}
+RUN pip install -r requirements.txt --target ${LAMBDA_TASK_ROOT} --no-cache-dir
+
+# Pre-download FastEmbed models and store them in the Lambda task root directory.
+# This ensures that the models are available at runtime without needing to download them on-the-fly, with lambda possibly crashing.
+ENV FASTEMBED_CACHE_PATH="${LAMBDA_TASK_ROOT}/fastembed_cache"
+RUN mkdir -p ${FASTEMBED_CACHE_PATH}
+RUN python3 -c "from fastembed import TextEmbedding, SparseTextEmbedding; \
+    print('Downloading dense model...'); \
+    TextEmbedding(model_name='BAAI/bge-small-en-v1.5', cache_dir='${FASTEMBED_CACHE_PATH}'); \
+    print('Downloading sparse model...'); \
+    SparseTextEmbedding(model_name='Qdrant/bm25', cache_dir='${FASTEMBED_CACHE_PATH}');"
+
+# We copy the src code to the 'src' directory inside the Lambda task root in order to 
+# keep the module structure and allow for proper imports from utils.logger and db.qdrant.qdrant_client.
+COPY src/ ${LAMBDA_TASK_ROOT}/src
+
+# Set an environment variable for FastEmbed cache path
+ENV FASTEMBED_CACHE_PATH="${LAMBDA_TASK_ROOT}/fastembed_cache"
+
+# Set the CMD command to the handler function to execute when a request is made to the Lambda function.
+CMD [ "src.backend_api.main.handler" ]

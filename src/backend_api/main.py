@@ -3,6 +3,7 @@ from time import time
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
+from mangum import Mangum
 
 from src.db.qdrant.qdrant_client import QdrantStorage
 
@@ -65,6 +66,7 @@ async def add_process_time_header(request: Request, call_next):
 app.include_router(query_router, prefix="/query", tags=["query"])
 app.include_router(health_router, tags=["health"])
 
+handler = Mangum(app, lifespan='off')
 
 if __name__ == '__main__':
     import uvicorn
