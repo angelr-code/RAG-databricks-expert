@@ -2,7 +2,8 @@ import os
 from time import time
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Security, HTTPException, Depends
+from fastapi.security import APIKeyHeader
 from mangum import Mangum
 
 from src.db.qdrant.qdrant_client import QdrantStorage
@@ -62,8 +63,31 @@ async def add_process_time_header(request: Request, call_next):
 
     return response
 
+### Security Header ###
 
-app.include_router(query_router, prefix="/query", tags=["query"])
+api_key_header = APIKeyHeader(name="X-backend-secret", auto_error=False)
+
+async def verify_secret(api_key: str = Security(api_key_header)) -> str:
+    """
+    Verify the provided API key against the server's secret.
+
+    Args:
+        api_key (str): The API key provided in the request header.
+    
+    Returns:
+        str: The validated API key.
+    """
+    server_secret = os.getenv("BACKEND_SECRET")
+
+    if server_secret and api_key != server_secret:
+        raise HTTPException(
+            status_code=403, 
+            detail="Denied Access: Invalid or missing secret."
+        )
+    return api_key
+
+
+app.include_router(query_router, prefix="/query", tags=["query"], dependencies=[Depends(verify_secret)])
 app.include_router(health_router, tags=["health"])
 
 handler = Mangum(app, lifespan='off')
@@ -76,5 +100,5 @@ if __name__ == '__main__':
         host="0.0.0.0",
         port=port,
         log_level="info",
-        reload=True  # auto-reload for DEV. Change to False in PRODUCTION.
+        reload=False  # True auto-reload for local dev. Change to False in PRODUCTION.
     )

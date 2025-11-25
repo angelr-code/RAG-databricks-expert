@@ -1,9 +1,19 @@
 import streamlit as st
 import requests
 import json
+import os
 import re
 from typing import Optional, List, Dict, Tuple
 from dataclasses import dataclass
+from dotenv import load_dotenv
+
+load_dotenv()
+
+load_dotenv()
+
+# --- DEBUG TEMPORAL (Borrar luego) ---
+secret = os.getenv("BACKEND_SECRET")
+print(f"👀 DEBUG: El secreto que veo es: '{secret}'")
 
 # ============================================================================
 # CONFIGURATION & CONSTANTS
@@ -507,6 +517,9 @@ def stream_api_response(
             - An error message string if the request failed, else None.
     """
     headers = {"Content-Type": "application/json"}
+    backend_secret = os.getenv("BACKEND_SECRET")
+    if backend_secret:
+        headers["X-Backend-Secret"] = backend_secret
     if api_key:
         headers["OpenAI-API-Key"] = api_key
     

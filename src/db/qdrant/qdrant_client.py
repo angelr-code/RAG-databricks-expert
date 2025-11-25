@@ -30,17 +30,15 @@ from src.backend_api.models.api_models import SearchResult
 
 logger = setup_logging()
 
-QDRANT_URL = os.getenv("QDRANT_URL")
-QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
-QDRANT_COLLECTION = os.getenv("QDRANT_COLLECTION", "docs")
-EMBEDDING_DIM = int(os.getenv("EMBEDDING_DIM", 384))
-
-
 class QdrantStorage():
-    def __init__(self, url=QDRANT_URL, collection=QDRANT_COLLECTION, dim=EMBEDDING_DIM):
-        self.client = AsyncQdrantClient(url, api_key=QDRANT_API_KEY,timeout=15)
-        self.collection = collection
-        self.dim = dim
+    def __init__(self):
+        self.url = os.getenv("QDRANT_URL")
+        self.api_key = os.getenv("QDRANT_API_KEY")
+        self.collection = os.getenv("QDRANT_COLLECTION", "docs")
+        self.dim = int(os.getenv("EMBEDDING_DIM", 384))
+
+        self.client = AsyncQdrantClient(self.url, api_key=self.api_key,timeout=15)
+
         self.dense_model = TextEmbedding(model_name="BAAI/bge-small-en-v1.5")
         self.sparse_model = SparseTextEmbedding(model_name="Qdrant/bm25")
 

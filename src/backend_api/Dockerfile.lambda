@@ -1,9 +1,9 @@
-FROM public.ecr.aws/lambda/python:3.12
+FROM public.ecr.aws/lambda/python:3.13
 
 # Copy the requirements file to the Lambda task root directory and install the dependencies.
 COPY src/backend_api/requirements.txt ${LAMBDA_TASK_ROOT}
 RUN pip install --upgrade pip && \
-    pip install -r requirements.txt --target ${LAMBDA_TASK_ROOT} --no-cache-dir --only-binary=:all:
+    pip install -r requirements.txt --target ${LAMBDA_TASK_ROOT} --no-cache-dir
 
 # Pre-download FastEmbed models and store them in the Lambda task root directory.
 # This ensures that the models are available at runtime without needing to download them on-the-fly, with lambda possibly crashing.
