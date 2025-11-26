@@ -16,26 +16,17 @@ def setup_logging(log_level: str = None):
         Logger: Configured logger instance.
     """
     log_level = log_level or os.getenv("LOG_LEVEL", "DEBUG").upper()
-
-    try:
-        from prefect.logging import get_run_logger
-        from prefect.context import get_run_context
-        get_run_context()
-        logger = get_run_logger()
-        logger.setLevel(log_level)
-        logger.debug(f"Logging initialized at {log_level} level (Prefect).")
-        return logger
-    except ImportError or RuntimeError:    # Prefect's get_run_logger() generates a RuntimeError when executed out of a Prefect flow.
-        loguru_logger.remove()
-        loguru_logger.add(
-                sys.stdout,
-                level=log_level,
-                colorize=True,
-                backtrace=True,
-                diagnose=True,
-                format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | "
-                "<level>{level}</level> | <cyan>{module}</cyan>:<cyan>{function}</cyan> - "
-                "<level>{message}</level>",
-            )
-        loguru_logger.debug(f"Logging initialized at {log_level} level (Loguru).")
-        return loguru_logger
+    
+    loguru_logger.remove()
+    loguru_logger.add(
+            sys.stdout,
+            level=log_level,
+            colorize=True,
+            backtrace=True,
+            diagnose=True,
+            format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | "
+            "<level>{level}</level> | <cyan>{module}</cyan>:<cyan>{function}</cyan> - "
+            "<level>{message}</level>",
+        )
+    loguru_logger.debug(f"Logging initialized at {log_level} level (Loguru).")
+    return loguru_logger

@@ -90,7 +90,7 @@ async def verify_secret(api_key: str = Security(api_key_header)) -> str:
 app.include_router(query_router, prefix="/query", tags=["query"], dependencies=[Depends(verify_secret)])
 app.include_router(health_router, tags=["health"])
 
-handler = Mangum(app, lifespan='off')
+handler = Mangum(app, lifespan='on')
 
 if __name__ == '__main__':
     import uvicorn

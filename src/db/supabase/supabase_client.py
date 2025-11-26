@@ -8,17 +8,17 @@ load_dotenv()
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
-from src.utils.logger import setup_logging
+from prefect.logging import get_run_logger
 
 from typing import Optional, Dict, Any, List
 
-logger = setup_logging()
 
 class SupabaseManager:
     def __init__(self):
         self.client = create_client(SUPABASE_URL, SUPABASE_KEY)
         self.sources_table = 'sources'
         self.documents_table = 'documents'
+        self.logger = get_run_logger()
 
     # --- Sources management ---
 
@@ -43,11 +43,11 @@ class SupabaseManager:
                                 .insert(data)\
                                 .execute()
             if response.data:
-                logger.info(f"New source created: {name}")
+                self.logger.info(f"New source created: {name}")
                 return response.data[0]
             return None
         except Exception as e:
-            logger.error(f"Error inserting a new source: {e}")
+            self.logger.error(f"Error inserting a new source: {e}")
             return None
         
     def get_source_by_name(self, name: str) -> Optional[Dict[str, Any]]:
@@ -66,7 +66,7 @@ class SupabaseManager:
                                 .execute()
             return response.data[0] if response.data else None
         except Exception as e:
-            logger.error(f"Error finding {name}: {e}")
+            self.logger.error(f"Error finding {name}: {e}")
             return None
         
     def list_sources(self) -> List:
@@ -79,7 +79,7 @@ class SupabaseManager:
                                 .execute()
             return response.data
         except Exception as e:
-            logger.error(f"Error listing sources: {e}")
+            self.logger.error(f"Error listing sources: {e}")
             return []
 
         
@@ -101,7 +101,7 @@ class SupabaseManager:
                                 .execute()
             return response.data[0] if response.data else None
         except Exception as e:
-            logger.error(f"Error checking the document for url {url}: {e}")
+            self.logger.error(f"Error checking the document for url {url}: {e}")
             return None
         
     def update_document_hash(self, document_id: str, new_hash: str, n_chunks: int) -> bool:
@@ -125,11 +125,11 @@ class SupabaseManager:
                                 .eq("id", document_id)\
                                 .execute()
             if response.data:
-                logger.info(f"Document {document_id} updated with new hash.")
+                self.logger.info(f"Document {document_id} updated with new hash.")
                 return True
             return False
         except Exception as e:
-            logger.error(f"Error updating document {document_id} hash: {e}")
+            self.logger.error(f"Error updating document {document_id} hash: {e}")
             return False
         
     def ingestion_checkpoint(self, document_id: str, n_chunks: int) -> bool:
@@ -152,11 +152,11 @@ class SupabaseManager:
                                 .eq("id", document_id)\
                                 .execute()
             if response.data:
-                logger.info(f"Document {document_id} updated.")
+                self.logger.info(f"Document {document_id} updated.")
                 return True
             return False
         except Exception as e:
-            logger.error(f"Error updating document {document_id}: {e}")
+            self.logger.error(f"Error updating document {document_id}: {e}")
             return False
                 
     def insert_document(self, source_id: str, url: str, doc_hash: str, title: str) -> Optional[str]:
@@ -183,9 +183,9 @@ class SupabaseManager:
                                 .execute()
             if response.data:
                 doc_id = response.data[0]['id']
-                logger.info(f"Document created (pending vectorial insertion): {doc_id} | {url}")
+                self.logger.info(f"Document created (pending vectorial insertion): {doc_id} | {url}")
                 return doc_id
             return None           
         except Exception as e:
-           logger.error(f"Error inserting document {doc_hash}: {e}")
+           self.logger.error(f"Error inserting document {doc_hash}: {e}")
            return None

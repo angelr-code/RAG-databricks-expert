@@ -6,6 +6,7 @@ from langchain_community.document_loaders import SitemapLoader
 from langchain_core.documents import Document
 
 from prefect import flow, task, unmapped
+from prefect.logging import get_run_logger
 
 from src.ingestion_pipeline.utils import (
     remove_nav_and_header_elements,
@@ -15,16 +16,15 @@ from src.ingestion_pipeline.utils import (
     process_document,
     aggregate_and_ingest
 )
-from src.utils.logger import setup_logging
 
-logger = setup_logging()
 
 @task
 async def load_documentation() -> List[Document]:
     """Loads all the documentation once"""
+    logger = get_run_logger()
     loader = SitemapLoader(
         "https://docs.databricks.com/en/doc-sitemap.xml",
-        filter_urls=["https://docs.databricks.com/aws/en/delta-sharing"],
+        filter_urls=["https://docs.databricks.com/aws/en/"],
         parsing_function=remove_nav_and_header_elements
     )
     docs = await asyncio.to_thread(loader.load) # Trick with asyncio to run sync code
@@ -41,6 +41,8 @@ async def static_load_flow():
         4. Aggregates and ingests new or updated chunks into Qdrant.
         5. Updates the Supabase database with ingestion checkpoints.
     """
+
+    logger = get_run_logger()
     db, qdrant = await get_managers()
     splitter = get_text_splitter()
     source_id = get_source_id(db, "Databricks Docs")
@@ -48,16 +50,20 @@ async def static_load_flow():
     docs = await load_documentation()
 
     logger.info("Mapping documents processing")
-    results = process_document.map(
-        document=docs,
-        db=unmapped(db),
-        qdrant=unmapped(qdrant),
-        source_id=unmapped(source_id),
-        text_splitter=unmapped(splitter),
-        doc_type = unmapped('Documentation')
-    )
+    BATCH_SIZE = 100
+    for i in range(0, len(docs), BATCH_SIZE):
+        batch = docs[i:i+BATCH_SIZE]
+        results = process_document.map(
+            document=batch,
+            db=unmapped(db),
+            qdrant=unmapped(qdrant),
+            source_id=unmapped(source_id),
+            text_splitter=unmapped(splitter),
+            doc_type = unmapped('Documentation')
+        )
+        await aggregate_and_ingest(results, qdrant, db)
+        logger.info(f"Documents {i} to {i + BATCH_SIZE} ingested in Qdrant")
     
-    await aggregate_and_ingest(results, qdrant, db)
 
 if __name__ == "__main__":
     asyncio.run(static_load_flow())

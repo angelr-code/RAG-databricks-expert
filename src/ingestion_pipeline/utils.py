@@ -5,6 +5,7 @@ from typing import List, Optional, Dict
 
 from prefect import task
 from prefect.cache_policies import NO_CACHE
+from prefect.logging import get_run_logger
 
 from bs4 import BeautifulSoup
 from langchain_core.documents import Document
@@ -12,10 +13,6 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from src.db.supabase.supabase_client import SupabaseManager
 from src.db.qdrant.qdrant_client import QdrantStorage
-
-from src.utils.logger import setup_logging
-
-logger = setup_logging()
 
 # Modified method from langchain docs to extract cleaner content 
 def remove_nav_and_header_elements(content: BeautifulSoup) -> str:
@@ -74,7 +71,7 @@ def html_to_clean_text(html: str) -> str:
 @task
 async def get_managers() -> tuple[SupabaseManager, QdrantStorage]:
     """Initializes and returns the Supabase and Qdrant managers."""
-    vectorstore = QdrantStorage()
+    vectorstore = QdrantStorage(logger=get_run_logger())
     await vectorstore.initialize()
     return SupabaseManager(), vectorstore
 
@@ -197,6 +194,7 @@ async def process_document(document: Document, db: SupabaseManager, qdrant: Qdra
         dict | None: A dictionary containing document ID, chunks, metadatas, action type, new hash, and number of chunks,
                       or None if the document is unchanged.
     """
+    logger = get_run_logger()
     url = document.metadata.get("source") or ""
     content = document.page_content or ""
 
@@ -260,6 +258,7 @@ async def aggregate_and_ingest(results: List[Dict | None], qdrant: QdrantStorage
         qdrant (QdrantStorage): The Qdrant storage instance.
         db (SupabaseManager): The Supabase manager instance.
     """
+    logger = get_run_logger()
     all_chunks = []
     all_metadatas = []
     indicators = []

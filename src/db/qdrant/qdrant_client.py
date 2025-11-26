@@ -28,16 +28,20 @@ from src.utils.logger import setup_logging
 
 from src.backend_api.models.api_models import SearchResult
 
-logger = setup_logging()
 
 class QdrantStorage():
-    def __init__(self):
+    def __init__(self, logger=None):
         self.url = os.getenv("QDRANT_URL")
         self.api_key = os.getenv("QDRANT_API_KEY")
         self.collection = os.getenv("QDRANT_COLLECTION", "docs")
         self.dim = int(os.getenv("EMBEDDING_DIM", 384))
 
         self.client = AsyncQdrantClient(self.url, api_key=self.api_key,timeout=15)
+
+        if logger:
+            self.logger = logger # prefect logger
+        else:
+            self.logger = setup_logging() # custom loguru logger
 
         self.dense_model = TextEmbedding(model_name="BAAI/bge-small-en-v1.5")
         self.sparse_model = SparseTextEmbedding(model_name="Qdrant/bm25")
@@ -77,13 +81,13 @@ class QdrantStorage():
                     ),
                     wait=True
                 )
-                logger.info(f"Collection '{self.collection}' created successfully in Qdrant with Hybrid Vector Configuration")
+                self.logger.info(f"Collection '{self.collection}' created successfully in Qdrant with Hybrid Vector Configuration")
 
             else: 
-                logger.info("Qdrant collection already exists")
+                self.logger.info("Qdrant collection already exists")
 
         except Exception as e:
-            logger.error(f"Error initializing Qdrant: {e}")
+            self.logger.error(f"Error initializing Qdrant: {e}")
             raise
 
     async def upsert(self, chunks: List[str], metadatas: List[Dict[str, Any]]):
@@ -115,9 +119,9 @@ class QdrantStorage():
 
             await self.client.upsert(collection_name=self.collection, points = points)
 
-            logger.info(f"Ingestion of {len(chunks)} vectors to Qdrant completed")
+            self.logger.info(f"Ingestion of {len(chunks)} vectors to Qdrant completed")
         except Exception as e:
-            logger.error(f"Vector ingestion failed: {e}")
+            self.logger.error(f"Vector ingestion failed: {e}")
             raise
 
     async def hybrid_search(self, query_text: str, top_k: int = 5) -> SearchResult:
@@ -198,15 +202,15 @@ class QdrantStorage():
                 self.collection,
                 points_selector=filter
             )
-            logger.info(f"Deleted all chunks for document {document_id}")
+            self.logger.info(f"Deleted all chunks for document {document_id}")
             return True
         except Exception as e:
-            logger.error(f"Error deleting chunks for document {document_id}: {e}")
+            self.logger.error(f"Error deleting chunks for document {document_id}: {e}")
             return False
         
         
     async def close(self):
         """Closes the Qdrant client connection."""
         await self.client.close()
-        logger.info("Qdrant client connection closed.")
+        self.logger.info("Qdrant client connection closed.")
     

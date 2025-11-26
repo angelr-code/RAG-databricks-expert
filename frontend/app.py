@@ -9,12 +9,6 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-load_dotenv()
-
-# --- DEBUG TEMPORAL (Borrar luego) ---
-secret = os.getenv("BACKEND_SECRET")
-print(f"👀 DEBUG: El secreto que veo es: '{secret}'")
-
 # ============================================================================
 # CONFIGURATION & CONSTANTS
 # ============================================================================
@@ -27,7 +21,7 @@ st.set_page_config(
 )
 
 # Backend API Configuration
-API_BASE_URL = "http://localhost:8000"
+API_BASE_URL = os.getenv("API_URL")
 STREAM_ENDPOINT = f"{API_BASE_URL}/query/stream"
 GENERATE_ENDPOINT = f"{API_BASE_URL}/query/generate"
 
