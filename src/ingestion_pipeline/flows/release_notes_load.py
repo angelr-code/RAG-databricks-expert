@@ -85,16 +85,22 @@ async def release_notes_flow(feed_url: str = "https://docs.databricks.com/aws/en
         #     db.delete_document(ed['id'])
 
     logger.info("Mapping documents processing")
-    results = process_document.map(
-        document=docs,
-        db=unmapped(db),
-        qdrant=unmapped(qdrant),
-        source_id=unmapped(source_id),
-        text_splitter=unmapped(splitter),
-        doc_type = unmapped('Release Notes')
-    )
-    
-    await aggregate_and_ingest(results, qdrant, db)
+    BATCH_SIZE = 25
+    for i in range(0, len(docs), BATCH_SIZE):
+        batch = docs[i:i+BATCH_SIZE]
+        results = process_document.map(
+            document=batch,
+            db=unmapped(db),
+            qdrant=unmapped(qdrant),
+            source_id=unmapped(source_id),
+            text_splitter=unmapped(splitter),
+            doc_type = unmapped('Release Notes')
+        )
+        await aggregate_and_ingest(results, qdrant, db)
+        logger.info(f"Release Notes {i} to {i + BATCH_SIZE} ingested in Qdrant")
+        await asyncio.sleep(1)
+
+    logger.info("Release Notes ingestion finished")
 
     logger.info("Release Notes ingestion finished")
 

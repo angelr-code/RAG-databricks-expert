@@ -50,7 +50,7 @@ async def static_load_flow():
     docs = await load_documentation()
 
     logger.info("Mapping documents processing")
-    BATCH_SIZE = 100
+    BATCH_SIZE = 50
     for i in range(0, len(docs), BATCH_SIZE):
         batch = docs[i:i+BATCH_SIZE]
         results = process_document.map(
@@ -63,6 +63,9 @@ async def static_load_flow():
         )
         await aggregate_and_ingest(results, qdrant, db)
         logger.info(f"Documents {i} to {i + BATCH_SIZE} ingested in Qdrant")
+        await asyncio.sleep(1)
+
+    logger.info("Documents ingestion finished")
     
 
 if __name__ == "__main__":

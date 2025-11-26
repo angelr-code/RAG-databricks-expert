@@ -17,5 +17,6 @@ CREATE TABLE documents (
   hash text,
   n_chunks integer DEFAULT 0,
   created_at timestamptz DEFAULT now(),
-  ingested_at timestamptz DEFAULT NULL
+  ingested_at timestamptz DEFAULT NULL,
+  CONSTRAINT unique_url_per_source UNIQUE (source_id, url) -- Constraint for adding new cloud providers avoiding URLs matching
 );
