@@ -1,0 +1,40 @@
+[project]
+name = "rag-databricks-expert"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    # WEB & DEPLOYMENT (Core API, Lambda, Logging)
+    "fastapi",
+    "uvicorn",
+    "mangum",           
+    "httpx",            
+    "loguru",      
+    "python-dotenv",
+    "pydantic",
+    "pydantic-settings",
+
+    # DATABASES
+    "supabase",        
+    "qdrant-client",    
+    "alembic",          
+    "asyncpg",        
+
+    # INGESTION & ORCHESTRATION
+    "prefect",        
+    "feedparser",      
+    "beautifulsoup4", 
+    "langchain-community", 
+    "langchain-core",
+
+    # ML/RAG
+    "openai",
+    "fastembed",
+    "sentence-transformers",
+    "transformers",
+    "torch",
+
+    # FRONTEND
+    "streamlit",
+]
