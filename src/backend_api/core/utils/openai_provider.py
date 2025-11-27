@@ -30,7 +30,6 @@ async def generate_openai(prompt: str, config: ModelConfig, api_key: str | None)
             messages=[
                 ChatCompletionSystemMessageParam(role="user",content=prompt)
             ],
-            temperature=config.temperature,
             max_completion_tokens=config.max_completion_tokens
         )
 
