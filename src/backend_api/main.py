@@ -1,10 +1,10 @@
 import os 
-from time import time
+# from time import time
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request, Security, HTTPException, Depends
+from fastapi import FastAPI, Security, HTTPException, Depends
 from fastapi.security import APIKeyHeader
-from mangum import Mangum
+# from mangum import Mangum
 
 from src.db.qdrant.qdrant_client import QdrantStorage
 
@@ -39,29 +39,29 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Middleware 
-@app.middleware("http")
-async def add_process_time_header(request: Request, call_next):
-    """
-    Middleware to log request processing time and details.
+# # Middleware 
+# @app.middleware("http")
+# async def add_process_time_header(request: Request, call_next):
+#     """
+#     Middleware to log request processing time and details.
     
-    Args:
-        request (Request): The incoming HTTP request.
-        call_next: The next middleware or route handler to call.
+#     Args:
+#         request (Request): The incoming HTTP request.
+#         call_next: The next middleware or route handler to call.
     
-    Returns:
-        Response: The HTTP response after processing.
-    """
-    start = time()
-    response = await call_next(request)
-    process_time = time() - start
+#     Returns:
+#         Response: The HTTP response after processing.
+#     """
+#     start = time()
+#     response = await call_next(request)
+#     process_time = time() - start
 
-    response.headers["X-Process-Time"] = str(process_time)
+#     response.headers["X-Process-Time"] = str(process_time)
 
-    if request.url.path != '/health':
-        logger.info(f"Path: {request.url.path} | Method: {request.method} | Status: {response.status_code} | Time: {process_time:.4f}s")
+#     if request.url.path != '/health':
+#         logger.info(f"Path: {request.url.path} | Method: {request.method} | Status: {response.status_code} | Time: {process_time:.4f}s")
 
-    return response
+#     return response
 
 ### Security Header ###
 
@@ -90,7 +90,7 @@ async def verify_secret(api_key: str = Security(api_key_header)) -> str:
 app.include_router(query_router, prefix="/query", tags=["query"], dependencies=[Depends(verify_secret)])
 app.include_router(health_router, tags=["health"])
 
-handler = Mangum(app, lifespan='on')
+# handler = Mangum(app, lifespan='on')
 
 if __name__ == '__main__':
     import uvicorn

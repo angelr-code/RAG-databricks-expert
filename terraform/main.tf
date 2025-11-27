@@ -132,7 +132,7 @@ resource "aws_lambda_permission" "allow_public_access" {
 resource "aws_lambda_function_url" "api_url" {
   function_name = aws_lambda_function.rag_backend_api.function_name
   authorization_type = "NONE" # Public URL 
-  invoke_mode = "BUFFERED" # Crucial for chat response streaming
+  invoke_mode = "RESPONSE_STREAM" # Crucial for chat response streaming
 
   cors {
     allow_origins = ["*"]
