@@ -56,14 +56,13 @@ async def static_load_flow():
         results = process_document.map(
             document=batch,
             db=unmapped(db),
-            qdrant=unmapped(qdrant),
             source_id=unmapped(source_id),
             text_splitter=unmapped(splitter),
             doc_type = unmapped('Documentation')
         )
         await aggregate_and_ingest(results, qdrant, db)
         logger.info(f"Documents {i} to {i + BATCH_SIZE} ingested in Qdrant")
-        await asyncio.sleep(1)
+        await asyncio.sleep(5) # 1
 
     logger.info("Documents ingestion finished")
     

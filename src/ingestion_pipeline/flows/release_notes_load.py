@@ -71,7 +71,7 @@ async def release_notes_flow(feed_url: str = "https://docs.databricks.com/aws/en
     """
     db, qdrant = await get_managers()
     splitter = get_text_splitter()
-    source_id = get_source_id(db, "Databricks Docs")
+    source_id = get_source_id(db, "Databricks Release Notes")
 
     docs = await load_release_notes_feed(feed_url=feed_url)
 
@@ -91,7 +91,6 @@ async def release_notes_flow(feed_url: str = "https://docs.databricks.com/aws/en
         results = process_document.map(
             document=batch,
             db=unmapped(db),
-            qdrant=unmapped(qdrant),
             source_id=unmapped(source_id),
             text_splitter=unmapped(splitter),
             doc_type = unmapped('Release Notes')
@@ -102,7 +101,6 @@ async def release_notes_flow(feed_url: str = "https://docs.databricks.com/aws/en
 
     logger.info("Release Notes ingestion finished")
 
-    logger.info("Release Notes ingestion finished")
 
 if __name__ == '__main__':
     """

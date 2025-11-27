@@ -178,7 +178,7 @@ def extract_title(document: Document) -> str:
 
 
 @task(retries=2, retry_delay_seconds=5, cache_policy=NO_CACHE)
-async def process_document(document: Document, db: SupabaseManager, qdrant: QdrantStorage, source_id: str, text_splitter: RecursiveCharacterTextSplitter, doc_type: str) -> Optional[Dict]:
+async def process_document(document: Document, db: SupabaseManager, source_id: str, text_splitter: RecursiveCharacterTextSplitter, doc_type: str) -> Optional[Dict]:
     """
     Processes a single document: checks for new or updated content, splits into chunks, and prepares metadata.
 
@@ -225,7 +225,7 @@ async def process_document(document: Document, db: SupabaseManager, qdrant: Qdra
         logger.info("Updated document")
         doc_id = existing_doc['id']
 
-        await qdrant.delete_by_document_id(doc_id)
+        #await qdrant.delete_by_document_id(doc_id)
         action = 'update'
     else:
         return None
@@ -261,6 +261,7 @@ async def aggregate_and_ingest(results: List[Dict | None], qdrant: QdrantStorage
     logger = get_run_logger()
     all_chunks = []
     all_metadatas = []
+    ids_to_delete = []
     indicators = []
 
     for res in results:
@@ -268,6 +269,13 @@ async def aggregate_and_ingest(results: List[Dict | None], qdrant: QdrantStorage
             all_chunks.extend(res["chunks"])
             all_metadatas.extend(res["metadatas"])
             indicators.append((res['doc_id'], res['action'], res['new_hash'], res['n_chunks']))
+
+            if res['action'] == 'update':
+                ids_to_delete.append(res['doc_id'])
+
+    if ids_to_delete:
+        for doc_id in ids_to_delete:
+            await qdrant.delete_by_document_id(doc_id)
 
     if all_chunks:
         await qdrant.upsert(all_chunks, all_metadatas)
