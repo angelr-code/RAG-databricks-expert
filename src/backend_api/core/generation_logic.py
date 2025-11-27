@@ -104,7 +104,7 @@ async def generate_answer(query_request: QueryRequest, search_result: SearchResu
     """
 
     selected_model = query_request.model or "gpt-4o-mini"
-    config = ModelConfig(requested_model=selected_model)
+    config = ModelConfig(requested_model=selected_model, max_completion_tokens=20000)
 
     prompt = build_prompt(query_request.query_text, search_result, config.max_completion_tokens)
     
@@ -140,7 +140,7 @@ async def generate_streaming_answer(query_request: QueryRequest, search_result: 
         AsyncGenerator[str, None]: An asynchronous generator yielding response chunks.
     """
     selected_model = query_request.model or "gpt-4o-mini"
-    config = ModelConfig(requested_model=selected_model)
+    config = ModelConfig(requested_model=selected_model, max_completion_tokens=20000)
 
     prompt = build_prompt(query_request.query_text, search_result, config.max_completion_tokens)
 

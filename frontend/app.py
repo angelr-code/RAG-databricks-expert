@@ -47,8 +47,8 @@ class ModelInfo:
     description: str
 
 OPENROUTER_MODELS = [
-    ModelInfo("tngtech/deepseek-r1t2-chimera:free", "Deepseek-r1t2-chimera", "🐳", "Massive 671B reasoning & coding engine. It has the highest latency"),
     ModelInfo("meta-llama/llama-3.3-70b-instruct:free", "Llama 3.3 70B Instruct", "🦙", "High-quality reasoning and fast"),
+    ModelInfo("tngtech/deepseek-r1t2-chimera:free", "Deepseek-r1t2-chimera", "🐳", "Massive 671B reasoning & coding engine. Maximum performance"),
     ModelInfo("nvidia/nemotron-nano-12b-v2-vl:free", "Nvidia Nemotron 12B", "🟢", "Light, Ultra fast and efficient")
 ]
 
@@ -468,7 +468,7 @@ def initialize_session_state():
     if "messages" not in st.session_state:
         st.session_state.messages = [{
             "role": "assistant",
-            "content": """Hello! 👋 I am your **specialized Databricks technical assistant**.
+            "content": """Hello! 👋 I am your **specialized Databricks AWS technical assistant**.
 
 I can help you with:
 - 🔧 **Delta Table Optimization**
@@ -477,7 +477,10 @@ I can help you with:
 - ⚡ **PySpark & Structured Streaming**
 - 📊 **MLflow & Machine Learning**
 
-How can I help you today?""",
+How can I help you today?
+
+**‼️ NOTE:** This app runs in AWS Lambda, first request may take longer due to cold start.
+""",
             "sources": []
         }]
 
@@ -672,7 +675,7 @@ def render_sidebar() -> Dict:
             "Sources to retrieve",
             min_value=1,
             max_value=20, 
-            value=5
+            value=10
         )
         
         # Context Window toggle
