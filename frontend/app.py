@@ -21,7 +21,7 @@ st.set_page_config(
 )
 
 # Backend API Configuration
-API_BASE_URL = st.secrets("API_URL")
+API_BASE_URL = st.secrets["API_URL"]
 STREAM_ENDPOINT = f"{API_BASE_URL}/query/stream"
 GENERATE_ENDPOINT = f"{API_BASE_URL}/query/generate"
 
@@ -514,7 +514,7 @@ def stream_api_response(
             - An error message string if the request failed, else None.
     """
     headers = {"Content-Type": "application/json"}
-    backend_secret = st.secrets("BACKEND_SECRET")
+    backend_secret = st.secrets["BACKEND_SECRET"]
     if backend_secret:
         headers["X-Backend-Secret"] = backend_secret
     if api_key:
