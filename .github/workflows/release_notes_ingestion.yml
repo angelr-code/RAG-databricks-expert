@@ -1,0 +1,47 @@
+name: Daily Release Notes Ingestion
+
+# Scheduling
+on:
+  schedule:
+    # Cron Sintax: 6:00 (UTC), every day
+    - cron: '0 6 * * *'
+  
+  # Manual trigger option from GitHub UI
+  workflow_dispatch:
+
+# Job definitions
+jobs:
+  correr-ingesta:
+    runs-on: ubuntu-latest
+    
+
+    steps:
+      # Step 1
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Step 2
+      - name: Python setup
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13' 
+          cache: 'pip' # Dependences will be cached
+
+      # Step 3
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r src/ingestion_pipeline/requirements.txt
+
+      # Step 4
+      - name: Run the ingestion pipeline
+        # Load environment variables from GitHub Secrets
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          QDRANT_URL: ${{ secrets.QDRANT_URL }}
+          QDRANT_API_KEY: ${{ secrets.QDRANT_API_KEY }}
+          PREFECT_API_URL: ${{ secrets.PREFECT_API_URL }}
+          PREFECT_API_KEY: ${{ secrets.PREFECT_API_KEY }}
+
+        run: python -m src.ingestion_pipeline.flows.release_notes_ingestion
