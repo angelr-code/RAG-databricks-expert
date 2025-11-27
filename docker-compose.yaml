@@ -1,6 +1,6 @@
 services:
   # ----------------------------
-  # Qdrant Vector DB
+  # Qdrant Vector DB (local dev)
   # ----------------------------
   qdrant:
     image: qdrant/qdrant
