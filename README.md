@@ -51,6 +51,8 @@
 </p>
 
 
+</div>
+
 ---
 
 A production level GenAI assistant engineered to query and synthesize technical information from Databricks AWS documentation and release notes. Demonstrating a reusable and extensible design applicable to other clouds or technical tools, this project demonstrates a complete **End-to-End MLOps lifecycle**: from automated data ingestion pipelines and hybrid vector retrieval to a serverless, containerized deployment on AWS. The system is designed with a decoupled architecture, separating the ingestion logic from the inference API, while leveraging a multi-service cloud architecture designed for zero operational cost.
