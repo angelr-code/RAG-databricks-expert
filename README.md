@@ -3,31 +3,60 @@
 # RAG-DATABRICKS-EXPERT
 
 <p>
-  <img src="https://img.shields.io/badge/Streamlit-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white" alt="Streamlit" />
-  <img src="https://img.shields.io/badge/Supabase-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white" alt="Supabase" />
-  <img src="https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white" alt="FastAPI" />
-  <img src="https://img.shields.io/badge/LangChain-1C3C3C?style=for-the-badge&logo=langchain&logoColor=white" alt="LangChain" />
-  <img src="https://img.shields.io/badge/Prefect-000000?style=for-the-badge&logo=prefect&logoColor=white" alt="Prefect" />
-  <img src="https://img.shields.io/badge/Qdrant-B90042?style=for-the-badge&logo=qdrant&logoColor=white" alt="Qdrant" />
-  <img src="https://img.shields.io/badge/AWS-232F3E?style=for-the-badge&logo=amazon-aws&logoColor=white" alt="AWS" /></p>
-<p>
-  <img src="https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white" alt="Docker" />
-  <img src="https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python" />
-  <img src="https://img.shields.io/badge/GitHub_Actions-2088FF?style=for-the-badge&logo=github-actions&logoColor=white" alt="GitHub Actions" />
-  <img src="https://img.shields.io/badge/OpenAI-412991?style=for-the-badge&logo=openai&logoColor=white" alt="OpenAI" />
-  <img src="https://img.shields.io/badge/Terraform-7B42BC?style=for-the-badge&logo=terraform&logoColor=white" alt="Terraform" />
-  <img src="https://img.shields.io/badge/uv-DE5FE6?style=for-the-badge&logo=python&logoColor=white" alt="uv" />
-  <img src="https://img.shields.io/badge/Pydantic-E92063?style=for-the-badge&logo=pydantic&logoColor=white" alt="Pydantic" />
+  <a href="https://streamlit.io/" target="_blank">
+    <img src="https://img.shields.io/badge/Streamlit-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white" alt="Streamlit" />
+  </a>
+  <a href="https://supabase.com/" target="_blank">
+    <img src="https://img.shields.io/badge/Supabase-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white" alt="Supabase" />
+  </a>
+  <a href="https://fastapi.tiangolo.com/" target="_blank">
+    <img src="https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white" alt="FastAPI" />
+  </a>
+  <a href="https://www.langchain.com/" target="_blank">
+    <img src="https://img.shields.io/badge/LangChain-1C3C3C?style=for-the-badge&logo=langchain&logoColor=white" alt="LangChain" />
+  </a>
+  <a href="https://www.prefect.io/" target="_blank">
+    <img src="https://img.shields.io/badge/Prefect-000000?style=for-the-badge&logo=prefect&logoColor=white" alt="Prefect" />
+  </a>
+  <a href="https://qdrant.io/" target="_blank">
+    <img src="https://img.shields.io/badge/Qdrant-B90042?style=for-the-badge&logo=qdrant&logoColor=white" alt="Qdrant" />
+  </a>
+  <a href="https://aws.amazon.com/" target="_blank">
+    <img src="https://img.shields.io/badge/AWS-232F3E?style=for-the-badge&logo=amazon-aws&logoColor=white" alt="AWS" />
+  </a>
 </p>
 
-</div>
+<p>
+  <a href="https://www.docker.com/" target="_blank">
+    <img src="https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white" alt="Docker" />
+  </a>
+  <a href="https://www.python.org/" target="_blank">
+    <img src="https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python" />
+  </a>
+  <a href="https://github.com/features/actions" target="_blank">
+    <img src="https://img.shields.io/badge/GitHub_Actions-2088FF?style=for-the-badge&logo=github-actions&logoColor=white" alt="GitHub Actions" />
+  </a>
+  <a href="https://openai.com/" target="_blank">
+    <img src="https://img.shields.io/badge/OpenAI-412991?style=for-the-badge&logo=openai&logoColor=white" alt="OpenAI" />
+  </a>
+  <a href="https://www.terraform.io/" target="_blank">
+    <img src="https://img.shields.io/badge/Terraform-7B42BC?style=for-the-badge&logo=terraform&logoColor=white" alt="Terraform" />
+  </a>
+  <a href="https://www.uvicorn.org/" target="_blank">
+    <img src="https://img.shields.io/badge/uv-DE5FE6?style=for-the-badge&logo=python&logoColor=white" alt="uv" />
+  </a>
+  <a href="https://docs.pydantic.dev/" target="_blank">
+    <img src="https://img.shields.io/badge/Pydantic-E92063?style=for-the-badge&logo=pydantic&logoColor=white" alt="Pydantic" />
+  </a>
+</p>
+
 
 ---
 
 A production level GenAI assistant engineered to query and synthesize technical information from Databricks AWS documentation and release notes. Demonstrating a reusable and extensible design applicable to other clouds or technical tools, this project demonstrates a complete **End-to-End MLOps lifecycle**: from automated data ingestion pipelines and hybrid vector retrieval to a serverless, containerized deployment on AWS. The system is designed with a decoupled architecture, separating the ingestion logic from the inference API, while leveraging a multi-service cloud architecture designed for zero operational cost.
 
 <div align="center">
-  <img src="assets/demo.gif" alt="Demo RAG Databricks" width="75%">
+  <img src="assets/demo.gif" alt="Demo RAG Databricks" width="100%">
 </div>
 
 ### Why a RAG Expert on Databricks?
@@ -47,7 +76,7 @@ This project focuses on **Engineering and Production Level practices**:
 ## ☁️ Cloud Architecture
 
 <div align="center">
-  <img src="assets/diagram.png" alt="RAG Diagram" width="55%">
+  <img src="assets/diagram.png" alt="RAG Diagram" width="90%">
 </div>
 
 ---
