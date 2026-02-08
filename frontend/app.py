@@ -47,9 +47,9 @@ class ModelInfo:
     description: str
 
 OPENROUTER_MODELS = [
-    ModelInfo("qwen/qwen3-next-80b-a3b-instruct:free", "Qwen3 Next 80B A3B Instruct", "👾", "High-quality reasoning and fast"),
+    ModelInfo("nvidia/nemotron-nano-12b-v2-vl:free", "Nvidia Nemotron 12B", "🟢", "Light, Ultra fast and efficient"),
+    ModelInfo("openai/gpt-oss-120b:free", "gpt-oss-120b", "🔓", "High-quality reasoning and fast"),
     ModelInfo("tngtech/deepseek-r1t2-chimera:free", "Deepseek-r1t2-chimera", "🐳", "Massive 671B reasoning & coding engine. Maximum performance"),
-    ModelInfo("nvidia/nemotron-nano-12b-v2-vl:free", "Nvidia Nemotron 12B", "🟢", "Light, Ultra fast and efficient")
 ]
 
 OPENAI_MODELS = [
