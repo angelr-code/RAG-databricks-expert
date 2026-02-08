@@ -47,7 +47,7 @@ class ModelInfo:
     description: str
 
 OPENROUTER_MODELS = [
-    ModelInfo("meta-llama/llama-3.3-70b-instruct:free", "Llama 3.3 70B Instruct", "🦙", "High-quality reasoning and fast"),
+    ModelInfo("qwen/qwen3-next-80b-a3b-instruct:free", "Qwen3 Next 80B A3B Instruct", "👾", "High-quality reasoning and fast"),
     ModelInfo("tngtech/deepseek-r1t2-chimera:free", "Deepseek-r1t2-chimera", "🐳", "Massive 671B reasoning & coding engine. Maximum performance"),
     ModelInfo("nvidia/nemotron-nano-12b-v2-vl:free", "Nvidia Nemotron 12B", "🟢", "Light, Ultra fast and efficient")
 ]

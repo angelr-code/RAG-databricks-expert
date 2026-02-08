@@ -216,3 +216,4 @@ volumes/
 *.tfstate
 *.tfstate.backup
 *.tfvars
+.DS_Store
